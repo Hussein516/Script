@@ -1,5 +1,22 @@
+--[[                              
+                                           .·´`·.
+                               .·´`·´`´     ·´.`
+                          ..·´                '..'
+                      .·´,·´        . .  ::::::::`·.
+                  .·´`·´        .·´,.`. `·.. ::::::: `·..
+              .·´           .·´.  /..´.·` .` .:::::::::  `·.
+          .·´           .·´ .'. `·-·´ . ´  `  .`·.::::::::.·´.'
+      .·´           . ´ .·´     `·-·´          `·.`·.,.·´.·´
+  .·´           . ´ .·´         7 S O N E         `·.'.·´
+ I,.`.,     .·´  ·´
+  `·..·` ·´ .·´
+      ` ·' ´
+
+]]
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LocalPlayer = Players.LocalPlayer
 
 local TELEPORT_DIST  = 50
@@ -11,19 +28,51 @@ local PART_RANGE     = 12
 local MIN_VELOCITY   = 14
 local FACE_THRESHOLD = 0.35
 
-local scriptEnabled = false
+local shieldEnabled = false
+local killAuraEnabled = false
+local autoChestEnabled = false
+local autoTrainEnabled = false
+
 local isDodging = false
 local dodgeEndTime = 0
 local dodgeDir = Vector3.new(0, 0, 0)
 local char, hum, hrp
 
-local screenGui, mainFrame, statusDot, statusText, toggleBtn, toggleImageBtn
+local screenGui, mainFrame
+local shieldBtn, shieldBtnGrad
+local killAuraBtn, killAuraBtnGrad
+local autoChestBtn, autoChestBtnGrad
+local autoTrainBtn, autoTrainBtnGrad
+local toggleImageBtn
 
 local ATTACK_SIGNS = {
     "attack", "slash", "lunge", "stomp", "punch", "hit",
     "12039819520", "12082196504", "12039931283",
     "522635514", "522638767", "12039924702"
 }
+
+local PunchRemote = ReplicatedStorage:WaitForChild("7c467027f4c5402bb8b0472abe80d31c")
+local ChestsRemote = ReplicatedStorage:WaitForChild("Chests")
+local TrainRemote = ReplicatedStorage:WaitForChild("2663824b812c4e1e80abcb37b7ea983c")
+
+local firstChestReady = false
+local secondChestReady = false
+
+ChestsRemote.OnClientEvent:Connect(function(action, chestType, value)
+    if chestType == "FirstChest" then
+        if action == "COUNTDOWNOVER" then
+            firstChestReady = true
+        elseif action == "SELECTEDPRIZE" or action == "COUNTDOWN" then
+            firstChestReady = false
+        end
+    elseif chestType == "SecondChest" then
+        if action == "COUNTDOWNOVER" then
+            secondChestReady = true
+        elseif action == "SELECTEDPRIZE" or action == "COUNTDOWN" then
+            secondChestReady = false
+        end
+    end
+end)
 
 local function createGUI()
     screenGui = Instance.new("ScreenGui")
@@ -34,8 +83,8 @@ local function createGUI()
 
     mainFrame = Instance.new("Frame")
     mainFrame.Name = "MainFrame"
-    mainFrame.Size = UDim2.new(0, 300, 0, 220)
-    mainFrame.Position = UDim2.new(0.5, -150, 0.5, -110)
+    mainFrame.Size = UDim2.new(0, 300, 0, 360)
+    mainFrame.Position = UDim2.new(0.5, -150, 0.5, -180)
     mainFrame.BackgroundColor3 = Color3.fromRGB(26, 26, 46)
     mainFrame.BorderSizePixel = 0
     mainFrame.Visible = false
@@ -100,64 +149,39 @@ local function createGUI()
     })
     divGrad.Parent = divider
 
-    local statusLabel = Instance.new("TextLabel")
-    statusLabel.Size = UDim2.new(0, 60, 0, 22)
-    statusLabel.Position = UDim2.new(0, 24, 0, 92)
-    statusLabel.BackgroundTransparency = 1
-    statusLabel.Text = "الحالة"
-    statusLabel.TextColor3 = Color3.fromRGB(160, 160, 160)
-    statusLabel.Font = Enum.Font.Gotham
-    statusLabel.TextSize = 13
-    statusLabel.TextXAlignment = Enum.TextXAlignment.Left
-    statusLabel.Parent = mainFrame
+    local function makeButton(name, text, posY)
+        local btn = Instance.new("TextButton")
+        btn.Name = name
+        btn.Size = UDim2.new(0.85, 0, 0, 40)
+        btn.Position = UDim2.new(0.075, 0, 0, posY)
+        btn.BackgroundColor3 = Color3.fromRGB(0, 210, 106)
+        btn.Text = text
+        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        btn.Font = Enum.Font.GothamBold
+        btn.TextSize = 14
+        btn.BorderSizePixel = 0
+        btn.AutoButtonColor = true
+        btn.Parent = mainFrame
 
-    statusDot = Instance.new("Frame")
-    statusDot.Name = "StatusDot"
-    statusDot.Size = UDim2.new(0, 8, 0, 8)
-    statusDot.Position = UDim2.new(1, -80, 0, 99)
-    statusDot.BackgroundColor3 = Color3.fromRGB(108, 122, 148)
-    statusDot.BorderSizePixel = 0
-    statusDot.Parent = mainFrame
+        local btnCorner = Instance.new("UICorner")
+        btnCorner.CornerRadius = UDim.new(0, 12)
+        btnCorner.Parent = btn
 
-    local dotCorner = Instance.new("UICorner")
-    dotCorner.CornerRadius = UDim.new(1, 0)
-    dotCorner.Parent = statusDot
+        local btnGrad = Instance.new("UIGradient")
+        btnGrad.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 210, 106)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 168, 84))
+        })
+        btnGrad.Rotation = 135
+        btnGrad.Parent = btn
 
-    statusText = Instance.new("TextLabel")
-    statusText.Size = UDim2.new(0, 60, 0, 22)
-    statusText.Position = UDim2.new(1, -68, 0, 92)
-    statusText.BackgroundTransparency = 1
-    statusText.Text = "متوقف"
-    statusText.TextColor3 = Color3.fromRGB(108, 122, 148)
-    statusText.Font = Enum.Font.GothamBold
-    statusText.TextSize = 13
-    statusText.TextXAlignment = Enum.TextXAlignment.Left
-    statusText.Parent = mainFrame
+        return btn, btnGrad
+    end
 
-    toggleBtn = Instance.new("TextButton")
-    toggleBtn.Name = "ToggleBtn"
-    toggleBtn.Size = UDim2.new(0.85, 0, 0, 48)
-    toggleBtn.Position = UDim2.new(0.075, 0, 0, 130)
-    toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 210, 106)
-    toggleBtn.Text = "تشغيل السكربت"
-    toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    toggleBtn.Font = Enum.Font.GothamBold
-    toggleBtn.TextSize = 15
-    toggleBtn.BorderSizePixel = 0
-    toggleBtn.AutoButtonColor = true
-    toggleBtn.Parent = mainFrame
-
-    local btnCorner = Instance.new("UICorner")
-    btnCorner.CornerRadius = UDim.new(0, 12)
-    btnCorner.Parent = toggleBtn
-
-    local btnGrad = Instance.new("UIGradient")
-    btnGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 210, 106)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 168, 84))
-    })
-    btnGrad.Rotation = 135
-    btnGrad.Parent = toggleBtn
+    shieldBtn, shieldBtnGrad = makeButton("ShieldBtn", "تشغيل الحماية", 90)
+    killAuraBtn, killAuraBtnGrad = makeButton("KillAuraBtn", "تشغيل ضرب تلقائي من بعيد", 138)
+    autoChestBtn, autoChestBtnGrad = makeButton("AutoChestBtn", "تشغيل تجميع صندوق تلقائي Beta", 186)
+    autoTrainBtn, autoTrainBtnGrad = makeButton("AutoTrainBtn", "تشغيل تمرين تلقائي", 234)
 
     local creditLabel = Instance.new("TextLabel")
     creditLabel.Size = UDim2.new(1, 0, 0, 18)
@@ -188,33 +212,54 @@ local function createGUI()
     imgStroke.Thickness = 1
     imgStroke.Parent = toggleImageBtn
 
-    local function updateGUI()
-        if scriptEnabled then
-            statusDot.BackgroundColor3 = Color3.fromRGB(0, 210, 106)
-            statusText.Text = "يعمل"
-            statusText.TextColor3 = Color3.fromRGB(0, 210, 106)
-            toggleBtn.Text = "إطفاء السكربت"
-            toggleBtn.BackgroundColor3 = Color3.fromRGB(233, 69, 96)
+    local function updateButton(btn, btnGrad, enabled, onText, offText, onColor, offColor)
+        if enabled then
+            btn.Text = onText
+            btn.BackgroundColor3 = onColor[1]
             btnGrad.Color = ColorSequence.new({
-                ColorSequenceKeypoint.new(0, Color3.fromRGB(233, 69, 96)),
-                ColorSequenceKeypoint.new(1, Color3.fromRGB(194, 58, 81))
+                ColorSequenceKeypoint.new(0, onColor[1]),
+                ColorSequenceKeypoint.new(1, onColor[2])
             })
         else
-            statusDot.BackgroundColor3 = Color3.fromRGB(108, 122, 148)
-            statusText.Text = "متوقف"
-            statusText.TextColor3 = Color3.fromRGB(108, 122, 148)
-            toggleBtn.Text = "تشغيل السكربت"
-            toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 210, 106)
+            btn.Text = offText
+            btn.BackgroundColor3 = offColor[1]
             btnGrad.Color = ColorSequence.new({
-                ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 210, 106)),
-                ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 168, 84))
+                ColorSequenceKeypoint.new(0, offColor[1]),
+                ColorSequenceKeypoint.new(1, offColor[2])
             })
         end
     end
 
-    toggleBtn.MouseButton1Click:Connect(function()
-        scriptEnabled = not scriptEnabled
-        updateGUI()
+    shieldBtn.MouseButton1Click:Connect(function()
+        shieldEnabled = not shieldEnabled
+        updateButton(shieldBtn, shieldBtnGrad, shieldEnabled, 
+            "إطفاء الحماية", "تشغيل الحماية",
+            {Color3.fromRGB(233, 69, 96), Color3.fromRGB(194, 58, 81)},
+            {Color3.fromRGB(0, 210, 106), Color3.fromRGB(0, 168, 84)})
+    end)
+
+    killAuraBtn.MouseButton1Click:Connect(function()
+        killAuraEnabled = not killAuraEnabled
+        updateButton(killAuraBtn, killAuraBtnGrad, killAuraEnabled,
+            "إطفاء ضرب تلقائي من بعيد", "تشغيل ضرب تلقائي من بعيد",
+            {Color3.fromRGB(233, 69, 96), Color3.fromRGB(194, 58, 81)},
+            {Color3.fromRGB(0, 210, 106), Color3.fromRGB(0, 168, 84)})
+    end)
+
+    autoChestBtn.MouseButton1Click:Connect(function()
+        autoChestEnabled = not autoChestEnabled
+        updateButton(autoChestBtn, autoChestBtnGrad, autoChestEnabled,
+            "إطفاء تجميع صندوق تلقائي Beta", "تشغيل تجميع صندوق تلقائي Beta",
+            {Color3.fromRGB(233, 69, 96), Color3.fromRGB(194, 58, 81)},
+            {Color3.fromRGB(0, 210, 106), Color3.fromRGB(0, 168, 84)})
+    end)
+
+    autoTrainBtn.MouseButton1Click:Connect(function()
+        autoTrainEnabled = not autoTrainEnabled
+        updateButton(autoTrainBtn, autoTrainBtnGrad, autoTrainEnabled,
+            "إطفاء تمرين تلقائي", "تشغيل تمرين تلقائي",
+            {Color3.fromRGB(233, 69, 96), Color3.fromRGB(194, 58, 81)},
+            {Color3.fromRGB(0, 210, 106), Color3.fromRGB(0, 168, 84)})
     end)
 
     toggleImageBtn.MouseButton1Click:Connect(function()
@@ -344,21 +389,72 @@ if LocalPlayer.Character then
 end
 LocalPlayer.CharacterAdded:Connect(setupCharacter)
 
-RunService.Heartbeat:Connect(function()
-    if not scriptEnabled or not hrp or not hum or hum.Health <= 0 then return end
+local lastAttackTime = 0
+local lastChestTime = 0
+local lastTrainTime = 0
 
-    if isDodging then
-        if tick() < dodgeEndTime then
-            hrp.AssemblyLinearVelocity = dodgeDir * DODGE_VELOCITY
+RunService.Heartbeat:Connect(function()
+    local now = tick()
+
+    if shieldEnabled and hrp and hum and hum.Health > 0 then
+        if isDodging then
+            if now < dodgeEndTime then
+                hrp.AssemblyLinearVelocity = dodgeDir * DODGE_VELOCITY
+            else
+                isDodging = false
+            end
         else
-            isDodging = false
-        end
-    else
-        if not detectAnimations() then
-            if not detectTools() then
-                detectMovingParts()
+            if not detectAnimations() then
+                if not detectTools() then
+                    detectMovingParts()
+                end
             end
         end
+    end
+
+    if killAuraEnabled and now - lastAttackTime >= 0.013 then
+        lastAttackTime = now
+        local myChar = LocalPlayer.Character
+        if myChar and myChar:FindFirstChild("HumanoidRootPart") then
+            local myPos = myChar.HumanoidRootPart.Position
+            for _, target in ipairs(Players:GetPlayers()) do
+                if target ~= LocalPlayer and target.Character then
+                    local tHRP = target.Character:FindFirstChild("HumanoidRootPart")
+                    local tHum = target.Character:FindFirstChildOfClass("Humanoid")
+                    if tHRP and tHum and tHum.Health > 0 then
+                        local dx = myPos.X - tHRP.Position.X
+                        local dy = myPos.Y - tHRP.Position.Y
+                        local dz = myPos.Z - tHRP.Position.Z
+                        if dx*dx + dy*dy + dz*dz <= 40000 then
+                            pcall(function()
+                                PunchRemote:FireServer("PUNCH", target)
+                            end)
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    if autoChestEnabled and now - lastChestTime >= 0.5 then
+        lastChestTime = now
+        if firstChestReady then
+            pcall(function()
+                ChestsRemote:FireServer("SELECTPRIZE", "FirstChest")
+            end)
+        end
+        if secondChestReady then
+            pcall(function()
+                ChestsRemote:FireServer("SELECTPRIZE", "SecondChest")
+            end)
+        end
+    end
+
+    if autoTrainEnabled and now - lastTrainTime >= 0.1 then
+        lastTrainTime = now
+        pcall(function()
+            TrainRemote:FireServer("999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999")
+        end)
     end
 end)
 
