@@ -1,0 +1,365 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+
+local TELEPORT_DIST  = 50
+local DETECT_RADIUS  = 25
+local DODGE_DURATION = 0.45
+local DODGE_VELOCITY = 80
+local TOOL_RANGE     = 18
+local PART_RANGE     = 12
+local MIN_VELOCITY   = 14
+local FACE_THRESHOLD = 0.35
+
+local scriptEnabled = false
+local isDodging = false
+local dodgeEndTime = 0
+local dodgeDir = Vector3.new(0, 0, 0)
+local char, hum, hrp
+
+local screenGui, mainFrame, statusDot, statusText, toggleBtn, toggleImageBtn
+
+local ATTACK_SIGNS = {
+    "attack", "slash", "lunge", "stomp", "punch", "hit",
+    "12039819520", "12082196504", "12039931283",
+    "522635514", "522638767", "12039924702"
+}
+
+local function createGUI()
+    screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "AntiHitShieldGUI"
+    screenGui.ResetOnSpawn = false
+    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+    mainFrame = Instance.new("Frame")
+    mainFrame.Name = "MainFrame"
+    mainFrame.Size = UDim2.new(0, 300, 0, 220)
+    mainFrame.Position = UDim2.new(0.5, -150, 0.5, -110)
+    mainFrame.BackgroundColor3 = Color3.fromRGB(26, 26, 46)
+    mainFrame.BorderSizePixel = 0
+    mainFrame.Visible = false
+    mainFrame.Active = true
+    mainFrame.Parent = screenGui
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 18)
+    corner.Parent = mainFrame
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(255, 255, 255)
+    stroke.Transparency = 0.92
+    stroke.Thickness = 1
+    stroke.Parent = mainFrame
+
+    local gradient = Instance.new("UIGradient")
+    gradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(26, 26, 46)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(22, 33, 62)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(15, 52, 96))
+    })
+    gradient.Rotation = 145
+    gradient.Parent = mainFrame
+
+    local title = Instance.new("TextLabel")
+    title.Name = "Title"
+    title.Size = UDim2.new(1, 0, 0, 30)
+    title.Position = UDim2.new(0, 0, 0, 18)
+    title.BackgroundTransparency = 1
+    title.Text = "SHIELD SYSTEM"
+    title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 20
+    title.Parent = mainFrame
+
+    local subtitle = Instance.new("TextLabel")
+    subtitle.Name = "Subtitle"
+    subtitle.Size = UDim2.new(1, 0, 0, 16)
+    subtitle.Position = UDim2.new(0, 0, 0, 48)
+    subtitle.BackgroundTransparency = 1
+    subtitle.Text = "ANTI-HIT PROTECTION"
+    subtitle.TextColor3 = Color3.fromRGB(136, 146, 176)
+    subtitle.Font = Enum.Font.Gotham
+    subtitle.TextSize = 11
+    subtitle.Parent = mainFrame
+
+    local divider = Instance.new("Frame")
+    divider.Name = "Divider"
+    divider.Size = UDim2.new(0.8, 0, 0, 1)
+    divider.Position = UDim2.new(0.1, 0, 0, 75)
+    divider.BackgroundColor3 = Color3.fromRGB(100, 200, 255)
+    divider.BackgroundTransparency = 0.7
+    divider.BorderSizePixel = 0
+    divider.Parent = mainFrame
+
+    local divGrad = Instance.new("UIGradient")
+    divGrad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(26, 26, 46)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(100, 200, 255)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(26, 26, 46))
+    })
+    divGrad.Parent = divider
+
+    local statusLabel = Instance.new("TextLabel")
+    statusLabel.Size = UDim2.new(0, 60, 0, 22)
+    statusLabel.Position = UDim2.new(0, 24, 0, 92)
+    statusLabel.BackgroundTransparency = 1
+    statusLabel.Text = "الحالة"
+    statusLabel.TextColor3 = Color3.fromRGB(160, 160, 160)
+    statusLabel.Font = Enum.Font.Gotham
+    statusLabel.TextSize = 13
+    statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+    statusLabel.Parent = mainFrame
+
+    statusDot = Instance.new("Frame")
+    statusDot.Name = "StatusDot"
+    statusDot.Size = UDim2.new(0, 8, 0, 8)
+    statusDot.Position = UDim2.new(1, -80, 0, 99)
+    statusDot.BackgroundColor3 = Color3.fromRGB(108, 122, 148)
+    statusDot.BorderSizePixel = 0
+    statusDot.Parent = mainFrame
+
+    local dotCorner = Instance.new("UICorner")
+    dotCorner.CornerRadius = UDim.new(1, 0)
+    dotCorner.Parent = statusDot
+
+    statusText = Instance.new("TextLabel")
+    statusText.Size = UDim2.new(0, 60, 0, 22)
+    statusText.Position = UDim2.new(1, -68, 0, 92)
+    statusText.BackgroundTransparency = 1
+    statusText.Text = "متوقف"
+    statusText.TextColor3 = Color3.fromRGB(108, 122, 148)
+    statusText.Font = Enum.Font.GothamBold
+    statusText.TextSize = 13
+    statusText.TextXAlignment = Enum.TextXAlignment.Left
+    statusText.Parent = mainFrame
+
+    toggleBtn = Instance.new("TextButton")
+    toggleBtn.Name = "ToggleBtn"
+    toggleBtn.Size = UDim2.new(0.85, 0, 0, 48)
+    toggleBtn.Position = UDim2.new(0.075, 0, 0, 130)
+    toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 210, 106)
+    toggleBtn.Text = "تشغيل السكربت"
+    toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    toggleBtn.Font = Enum.Font.GothamBold
+    toggleBtn.TextSize = 15
+    toggleBtn.BorderSizePixel = 0
+    toggleBtn.AutoButtonColor = true
+    toggleBtn.Parent = mainFrame
+
+    local btnCorner = Instance.new("UICorner")
+    btnCorner.CornerRadius = UDim.new(0, 12)
+    btnCorner.Parent = toggleBtn
+
+    local btnGrad = Instance.new("UIGradient")
+    btnGrad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 210, 106)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 168, 84))
+    })
+    btnGrad.Rotation = 135
+    btnGrad.Parent = toggleBtn
+
+    local creditLabel = Instance.new("TextLabel")
+    creditLabel.Size = UDim2.new(1, 0, 0, 18)
+    creditLabel.Position = UDim2.new(0, 0, 1, -28)
+    creditLabel.BackgroundTransparency = 1
+    creditLabel.Text = "الصانع : اخوك"
+    creditLabel.TextColor3 = Color3.fromRGB(108, 122, 148)
+    creditLabel.Font = Enum.Font.Gotham
+    creditLabel.TextSize = 11
+    creditLabel.Parent = mainFrame
+
+    toggleImageBtn = Instance.new("ImageButton")
+    toggleImageBtn.Name = "ToggleImageBtn"
+    toggleImageBtn.Size = UDim2.new(0, 44, 0, 44)
+    toggleImageBtn.Position = UDim2.new(1, -60, 0, 20)
+    toggleImageBtn.BackgroundColor3 = Color3.fromRGB(42, 42, 74)
+    toggleImageBtn.Image = "rbxassetid://135109030961007"
+    toggleImageBtn.BorderSizePixel = 0
+    toggleImageBtn.Parent = screenGui
+
+    local imgCorner = Instance.new("UICorner")
+    imgCorner.CornerRadius = UDim.new(0, 10)
+    imgCorner.Parent = toggleImageBtn
+
+    local imgStroke = Instance.new("UIStroke")
+    imgStroke.Color = Color3.fromRGB(255, 255, 255)
+    imgStroke.Transparency = 0.9
+    imgStroke.Thickness = 1
+    imgStroke.Parent = toggleImageBtn
+
+    local function updateGUI()
+        if scriptEnabled then
+            statusDot.BackgroundColor3 = Color3.fromRGB(0, 210, 106)
+            statusText.Text = "يعمل"
+            statusText.TextColor3 = Color3.fromRGB(0, 210, 106)
+            toggleBtn.Text = "إطفاء السكربت"
+            toggleBtn.BackgroundColor3 = Color3.fromRGB(233, 69, 96)
+            btnGrad.Color = ColorSequence.new({
+                ColorSequenceKeypoint.new(0, Color3.fromRGB(233, 69, 96)),
+                ColorSequenceKeypoint.new(1, Color3.fromRGB(194, 58, 81))
+            })
+        else
+            statusDot.BackgroundColor3 = Color3.fromRGB(108, 122, 148)
+            statusText.Text = "متوقف"
+            statusText.TextColor3 = Color3.fromRGB(108, 122, 148)
+            toggleBtn.Text = "تشغيل السكربت"
+            toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 210, 106)
+            btnGrad.Color = ColorSequence.new({
+                ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 210, 106)),
+                ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 168, 84))
+            })
+        end
+    end
+
+    toggleBtn.MouseButton1Click:Connect(function()
+        scriptEnabled = not scriptEnabled
+        updateGUI()
+    end)
+
+    toggleImageBtn.MouseButton1Click:Connect(function()
+        mainFrame.Visible = not mainFrame.Visible
+    end)
+
+    local dragging, dragStart, startPos
+    mainFrame.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = mainFrame.Position
+        end
+    end)
+
+    mainFrame.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - dragStart
+            mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+
+    mainFrame.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+end
+
+local function startDodge(fromPos)
+    if not hrp then return end
+    isDodging = true
+    dodgeEndTime = tick() + DODGE_DURATION
+
+    local myPos = hrp.Position
+    dodgeDir = (myPos - fromPos).Unit
+    if dodgeDir.Magnitude < 0.01 then
+        dodgeDir = hrp.CFrame.LookVector * -1
+    end
+    dodgeDir = Vector3.new(dodgeDir.X, 0, dodgeDir.Z).Unit
+
+    local newPos = myPos + dodgeDir * TELEPORT_DIST
+    hrp.CFrame = CFrame.new(newPos, newPos + dodgeDir)
+end
+
+local function detectAnimations()
+    if not hrp then return false end
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and plr.Character then
+            local oHRP = plr.Character:FindFirstChild("HumanoidRootPart")
+            local oHum = plr.Character:FindFirstChild("Humanoid")
+            if oHRP and oHum and (hrp.Position - oHRP.Position).Magnitude <= DETECT_RADIUS then
+                local animator = oHum:FindFirstChildOfClass("Animator")
+                if animator then
+                    for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+                        local name = track.Name:lower()
+                        local id = track.Animation and track.Animation.AnimationId or ""
+                        for _, sign in ipairs(ATTACK_SIGNS) do
+                            if name:find(sign:lower()) or id:find(sign) then
+                                startDodge(oHRP.Position)
+                                return true
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return false
+end
+
+local function detectTools()
+    if not hrp then return false end
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and plr.Character then
+            local oHRP = plr.Character:FindFirstChild("HumanoidRootPart")
+            if oHRP and (hrp.Position - oHRP.Position).Magnitude <= TOOL_RANGE then
+                if plr.Character:FindFirstChildOfClass("Tool") then
+                    local look = oHRP.CFrame.LookVector
+                    local toMe = (hrp.Position - oHRP.Position).Unit
+                    if look:Dot(toMe) > FACE_THRESHOLD then
+                        startDodge(oHRP.Position)
+                        return true
+                    end
+                end
+            end
+        end
+    end
+    return false
+end
+
+local function detectMovingParts()
+    if not hrp then return false end
+    local myPos = hrp.Position
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and plr.Character then
+            local oHRP = plr.Character:FindFirstChild("HumanoidRootPart")
+            if oHRP and (myPos - oHRP.Position).Magnitude <= DETECT_RADIUS then
+                for _, part in ipairs(plr.Character:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        for _, keyword in ipairs({"Hand", "Foot", "Arm", "Leg", "Handle"}) do
+                            if part.Name:find(keyword) then
+                                local dist = (myPos - part.Position).Magnitude
+                                if dist <= PART_RANGE and part.AssemblyLinearVelocity.Magnitude >= MIN_VELOCITY then
+                                    startDodge(part.Position)
+                                    return true
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return false
+end
+
+local function setupCharacter(newChar)
+    char = newChar
+    hum = char:WaitForChild("Humanoid")
+    hrp = char:WaitForChild("HumanoidRootPart")
+end
+
+if LocalPlayer.Character then
+    setupCharacter(LocalPlayer.Character)
+end
+LocalPlayer.CharacterAdded:Connect(setupCharacter)
+
+RunService.Heartbeat:Connect(function()
+    if not scriptEnabled or not hrp or not hum or hum.Health <= 0 then return end
+
+    if isDodging then
+        if tick() < dodgeEndTime then
+            hrp.AssemblyLinearVelocity = dodgeDir * DODGE_VELOCITY
+        else
+            isDodging = false
+        end
+    else
+        if not detectAnimations() then
+            if not detectTools() then
+                detectMovingParts()
+            end
+        end
+    end
+end)
+
+createGUI()
