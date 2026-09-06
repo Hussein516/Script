@@ -1,0 +1,283 @@
+--[[                              
+                                           .·´`·.
+                               .·´`·´`´     ·´.`
+                          ..·´                '..'
+                      .·´,·´        . .  ::::::::`·.
+                  .·´`·´        .·´,.`. `·.. ::::::: `·..
+              .·´           .·´.  /..´.·` .` .:::::::::  `·.
+          .·´           .·´ .'. `·-·´ . ´  `  .`·.::::::::.·´.'
+      .·´           . ´ .·´     `·-·´          `·.`·.,.·´.·´
+  .·´           . ´ .·´         7 S O N E         `·.'.·´
+ I,.`.,     .·´  ·´
+  `·..·` ·´ .·´
+      ` ·' ´
+
+]]
+
+local Players = game:GetService("Players")
+local MarketplaceService = game:GetService("MarketplaceService")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+
+local localPlayer = Players.LocalPlayer
+local toolName = "تخريب"
+local currentLaughTrack = nil
+
+pcall(function()
+	MarketplaceService.PromptPurchaseRequested:Connect(function() return false end)
+	MarketplaceService.PromptProductPurchaseRequested:Connect(function() return false end)
+	MarketplaceService.PromptGamePassPurchaseRequested:Connect(function() return false end)
+end)
+
+local function blockAllPurchaseGuis(guiContainer)
+	if not guiContainer then return end
+	
+	local function destroyIfPurchase(child)
+		local name = child.Name:lower()
+		if name:find("purchase") or name:find("shop") or name:find("store") or name:find("prompt") or name:find("pass") or name:find("buy") then
+			task.defer(function()
+				if child and child.Parent then
+					child:Destroy()
+				end
+			end)
+		end
+	end
+
+	for _, child in ipairs(guiContainer:GetChildren()) do
+		destroyIfPurchase(child)
+	end
+	guiContainer.ChildAdded:Connect(destroyIfPurchase)
+end
+
+blockAllPurchaseGuis(localPlayer:FindFirstChildOfClass("PlayerGui"))
+localPlayer.ChildAdded:Connect(function(child)
+	if child:IsA("PlayerGui") then blockAllPurchaseGuis(child) end
+end)
+
+local function isTargetPart(part)
+	if not part:IsA("BasePart") then return false end
+
+	local gudock = workspace:FindFirstChild("Gudock")
+	if gudock then
+		if part == gudock or part:IsDescendantOf(gudock) then
+			return true
+		end
+	end
+
+	if part.Name == "사라지는 파트" then
+		return true
+	end
+
+	local color = part.Color
+	local r = math.floor(color.R * 255 + 0.5)
+	local g = math.floor(color.G * 255 + 0.5)
+	local b = math.floor(color.B * 255 + 0.5)
+
+	if r == 16 and g == 42 and b == 220 then
+		return true
+	end
+
+	return false
+end
+
+local function addNoAnimScript(tool)
+	local s = Instance.new("LocalScript")
+	s.Name = "NoHoldAnim"
+	s.Source = [[
+		local tool = script.Parent
+		local player = game.Players.LocalPlayer
+		local character = player.Character or player.CharacterAdded:Wait()
+		local humanoid = character:WaitForChild("Humanoid")
+		local animator = humanoid:WaitForChild("Animator")
+		local idleAnimId = (humanoid.RigType == Enum.HumanoidRigType.R6) and "rbxassetid://507766388" or "rbxassetid://180435571"
+		local idleAnim = Instance.new("Animation")
+		idleAnim.AnimationId = idleAnimId
+		local currentTrack
+		tool.Equipped:Connect(function()
+			if currentTrack then currentTrack:Stop() end
+			currentTrack = animator:LoadAnimation(idleAnim)
+			currentTrack.Priority = Enum.AnimationPriority.Action
+			currentTrack:Play()
+		end)
+		tool.Unequipped:Connect(function()
+			if currentTrack then currentTrack:Stop() currentTrack = nil end
+		end)
+	]]
+	s.Parent = tool
+end
+
+local function giveTool()
+	local backpack = localPlayer:FindFirstChildOfClass("Backpack")
+	local character = localPlayer.Character
+	if backpack and not backpack:FindFirstChild(toolName) and (not character or not character:FindFirstChild(toolName)) then
+		local tool = Instance.new("Tool")
+		tool.Name = toolName
+		tool.RequiresHandle = true
+		tool.CanBeDropped = false
+
+		local handle = Instance.new("Part")
+		handle.Name = "Handle"
+		handle.Size = Vector3.new(2, 2, 2)
+		handle.Transparency = 1
+		handle.CanCollide = false
+		handle.Massless = true
+		handle.Parent = tool
+
+		addNoAnimScript(tool)
+		tool.Parent = backpack
+	end
+end
+
+giveTool()
+localPlayer.CharacterAdded:Connect(function()
+	task.wait(0.5)
+	giveTool()
+end)
+
+RunService.Heartbeat:Connect(function()
+	giveTool()
+
+	local character = localPlayer.Character
+	if not character then return end
+	local toolInHand = character:FindFirstChild(toolName)
+	local root = character:FindFirstChild("HumanoidRootPart")
+	local handle = toolInHand and toolInHand:FindFirstChild("Handle")
+
+	if not (toolInHand and root and handle) then return end
+
+	for _, obj in ipairs(workspace:GetDescendants()) do
+		if isTargetPart(obj) and firetouchinterest then
+			firetouchinterest(root, obj, 0)
+			firetouchinterest(handle, obj, 0)
+			firetouchinterest(root, obj, 1)
+			firetouchinterest(handle, obj, 1)
+		end
+	end
+end)
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "LaughGui"
+screenGui.ResetOnSpawn = false
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screenGui.DisplayOrder = 999999999
+screenGui.Parent = localPlayer:WaitForChild("PlayerGui")
+
+local buttonFrame = Instance.new("Frame")
+buttonFrame.Name = "LaughButtonFrame"
+buttonFrame.Size = UDim2.new(0, 120, 0, 50)
+buttonFrame.Position = UDim2.new(0, 20, 0.5, -25)
+buttonFrame.BackgroundColor3 = Color3.fromRGB(255, 200, 50)
+buttonFrame.BorderSizePixel = 0
+buttonFrame.BackgroundTransparency = 0.1
+buttonFrame.ZIndex = 100
+buttonFrame.Parent = screenGui
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 12)
+corner.Parent = buttonFrame
+
+local shadow = Instance.new("ImageLabel")
+shadow.Name = "Shadow"
+shadow.AnchorPoint = Vector2.new(0.5, 0.5)
+shadow.BackgroundTransparency = 1
+shadow.Position = UDim2.new(0.5, 0, 0.5, 4)
+shadow.Size = UDim2.new(1, 20, 1, 20)
+shadow.ZIndex = 99
+shadow.Image = "rbxassetid://1316045217"
+shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
+shadow.ImageTransparency = 0.6
+shadow.ScaleType = Enum.ScaleType.Slice
+shadow.SliceCenter = Rect.new(10, 10, 118, 118)
+shadow.Parent = buttonFrame
+
+local buttonText = Instance.new("TextLabel")
+buttonText.Name = "TextLabel"
+buttonText.Size = UDim2.new(1, 0, 1, 0)
+buttonText.BackgroundTransparency = 1
+buttonText.Text = "ابلععع"
+buttonText.TextColor3 = Color3.fromRGB(30, 30, 30)
+buttonText.TextSize = 22
+buttonText.Font = Enum.Font.GothamBold
+buttonText.ZIndex = 101
+buttonText.Parent = buttonFrame
+
+local clickButton = Instance.new("TextButton")
+clickButton.Name = "ClickButton"
+clickButton.Size = UDim2.new(1, 0, 1, 0)
+clickButton.BackgroundTransparency = 1
+clickButton.Text = ""
+clickButton.ZIndex = 102
+clickButton.Parent = buttonFrame
+
+local function playLaughAnimation()
+	local currentCharacter = localPlayer.Character
+	if not currentCharacter then return end
+
+	local currentHumanoid = currentCharacter:FindFirstChildOfClass("Humanoid")
+	if not currentHumanoid then return end
+
+	local torso = currentCharacter:FindFirstChild("Torso")
+	if not torso then return end
+
+	local animator = currentHumanoid:WaitForChild("Animator")
+
+	if currentLaughTrack then
+		currentLaughTrack:Stop(0)
+		currentLaughTrack:Destroy()
+		currentLaughTrack = nil
+	end
+
+	local anim = Instance.new("Animation")
+	anim.AnimationId = "rbxassetid://129423131"
+	anim.Name = "LaughAnimation"
+
+	currentLaughTrack = animator:LoadAnimation(anim)
+	if currentLaughTrack then
+		currentLaughTrack.Priority = Enum.AnimationPriority.Action
+		currentLaughTrack.Looped = false
+		currentLaughTrack:Play(0)
+
+		local tweenInfo = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+		local shrink = TweenService:Create(buttonFrame, tweenInfo, {Size = UDim2.new(0, 110, 0, 45)})
+		local grow = TweenService:Create(buttonFrame, tweenInfo, {Size = UDim2.new(0, 120, 0, 50)})
+
+		shrink:Play()
+		shrink.Completed:Connect(function()
+			grow:Play()
+		end)
+
+		currentLaughTrack.Stopped:Connect(function()
+			anim:Destroy()
+			if currentLaughTrack == currentLaughTrack then
+				currentLaughTrack = nil
+			end
+		end)
+	end
+end
+
+clickButton.MouseButton1Click:Connect(playLaughAnimation)
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	if not gameProcessed and input.KeyCode == Enum.KeyCode.L then
+		playLaughAnimation()
+	end
+end)
+
+clickButton.MouseEnter:Connect(function()
+	local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	local hoverTween = TweenService:Create(buttonFrame, tweenInfo, {
+		BackgroundColor3 = Color3.fromRGB(255, 220, 80),
+		Size = UDim2.new(0, 125, 0, 52)
+	})
+	hoverTween:Play()
+end)
+
+clickButton.MouseLeave:Connect(function()
+	local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	local leaveTween = TweenService:Create(buttonFrame, tweenInfo, {
+		BackgroundColor3 = Color3.fromRGB(255, 200, 50),
+		Size = UDim2.new(0, 120, 0, 50)
+	})
+	leaveTween:Play()
+end)
