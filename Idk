@@ -1,0 +1,313 @@
+local HttpService = game:GetService("HttpService")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local Lighting = game:GetService("Lighting")
+
+local LocalPlayer = Players.LocalPlayer
+local requestFunc = request or http_request or syn.request -- متوافق مع Delta
+
+-- الرابط الخاص بالـ Webhook
+local WEBHOOK_URL = "https://proud-sound-77a5.hsynalhndawy2.workers.dev/"
+
+-- نظام حفظ الأسماء المعدلة (Aliases)
+local aliasFileName = "ChatAliases.json"
+local userAliases = {}
+
+local function loadAliases()
+    if isfile and isfile(aliasFileName) then
+        local success, data = pcall(function()
+            return HttpService:JSONDecode(readfile(aliasFileName))
+        end)
+        if success and type(data) == "table" then
+            userAliases = data
+        end
+    end
+end
+
+local function saveAliases()
+    if writefile then
+        writefile(aliasFileName, HttpService:JSONEncode(userAliases))
+    end
+end
+loadAliases()
+
+-- إعدادات الواجهة (GUI)
+local sgui = Instance.new("ScreenGui")
+sgui.Name = "DeltaChatProject"
+sgui.ResetOnSpawn = false
+-- استخدام gethui() لحماية الواجهة في المحاكيات
+pcall(function() sgui.Parent = gethui() end)
+if not sgui.Parent then sgui.Parent = game.CoreGui end
+
+-- زر كتابة الرسالة بالزاوية (كما في 1000079332.png)
+local writeBtn = Instance.new("TextButton")
+writeBtn.Size = UDim2.new(0, 150, 0, 40)
+writeBtn.Position = UDim2.new(1, -160, 0, 10)
+writeBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+writeBtn.TextColor3 = Color3.new(1, 1, 1)
+writeBtn.Text = "اكتب رسالتك"
+writeBtn.Font = Enum.Font.GothamBold
+writeBtn.TextSize = 16
+Instance.new("UICorner", writeBtn).CornerRadius = UDim.new(0, 8)
+writeBtn.Parent = sgui
+
+-- نافذة إرسال الرسالة المخفية
+local sendFrame = Instance.new("Frame")
+sendFrame.Size = UDim2.new(0, 300, 0, 50)
+sendFrame.Position = UDim2.new(0.5, -150, 0.5, -25)
+sendFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+sendFrame.Visible = false
+Instance.new("UICorner", sendFrame).CornerRadius = UDim.new(0, 8)
+sendFrame.Parent = sgui
+
+local msgInput = Instance.new("TextBox")
+msgInput.Size = UDim2.new(1, -20, 1, -10)
+msgInput.Position = UDim2.new(0, 10, 0, 5)
+msgInput.BackgroundTransparency = 1
+msgInput.TextColor3 = Color3.new(1, 1, 1)
+msgInput.PlaceholderText = "اكتب هنا واضغط Enter..."
+msgInput.Text = ""
+msgInput.ClearTextOnFocus = false
+msgInput.Font = Enum.Font.Gotham
+msgInput.TextSize = 14
+msgInput.Parent = sendFrame
+
+-- حاوية الرسائل
+local messagesContainer = Instance.new("Frame")
+messagesContainer.Size = UDim2.new(0, 300, 0, 200)
+messagesContainer.Position = UDim2.new(0, 20, 0.5, -100) -- يسار الشاشة
+messagesContainer.BackgroundTransparency = 1
+messagesContainer.Parent = sgui
+
+-- متغيرات الأنظمة والمؤقتات
+local activeMessages = {} -- لحفظ الرسائل المعروضة حالياً [1] العلوية, [2] السفلية
+local lastMessageTime = 0
+local processedIds = {} -- لمنع تكرار الرسائل
+
+-- وظيفة تصميم وإنشاء رسالة جديدة
+local function createMessageFrame(username, text, id)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, 0, 0, 50)
+    frame.BackgroundColor3 = Color3.fromRGB(45, 60, 100) -- لون أزرق مقارب للصور
+    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
+    
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Size = UDim2.new(1, -10, 0, 20)
+    nameLabel.Position = UDim2.new(0, 5, 0, 2)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    
+    -- فحص إذا كان هناك اسم معدل
+    local displayName = userAliases[username] or username
+    if userAliases[username] then
+        nameLabel.Text = "["..username.."] -> " .. displayName
+    else
+        nameLabel.Text = "["..username.."]"
+    end
+    
+    nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+    nameLabel.Font = Enum.Font.GothamBold
+    nameLabel.TextSize = 12
+    nameLabel.Parent = frame
+    
+    local textLabel = Instance.new("TextLabel")
+    textLabel.Size = UDim2.new(1, -10, 0, 25)
+    textLabel.Position = UDim2.new(0, 5, 0, 22)
+    textLabel.BackgroundTransparency = 1
+    textLabel.TextColor3 = Color3.new(1, 1, 1)
+    textLabel.Text = text
+    textLabel.TextWrapped = true
+    textLabel.TextXAlignment = Enum.TextXAlignment.Left
+    textLabel.Font = Enum.Font.Gotham
+    textLabel.TextSize = 14
+    textLabel.Parent = frame
+    
+    frame.Parent = messagesContainer
+    
+    -- نظام الضغطة المطولة (Long Press) لتغيير الاسم
+    local touchStartTime = 0
+    local isTouching = false
+    
+    frame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            isTouching = true
+            touchStartTime = tick()
+            
+            task.delay(0.6, function() -- إذا استمر الضغط 0.6 ثانية
+                if isTouching and (tick() - touchStartTime) >= 0.5 then
+                    -- تفعيل تأثير الـ Blur والظلال
+                    local blur = Instance.new("BlurEffect")
+                    blur.Size = 15
+                    blur.Name = "ChatBlur"
+                    blur.Parent = Lighting
+                    
+                    local shadow = Instance.new("UIStroke")
+                    shadow.Thickness = 3
+                    shadow.Color = Color3.new(0, 0, 0)
+                    shadow.Transparency = 0.5
+                    shadow.Parent = frame
+                    
+                    frame.ZIndex = 10 -- رفع الرسالة للأمام
+                    
+                    -- نافذة تغيير الاسم
+                    local renameGui = Instance.new("ScreenGui", sgui)
+                    local rFrame = Instance.new("Frame", renameGui)
+                    rFrame.Size = UDim2.new(0, 250, 0, 80)
+                    rFrame.Position = UDim2.new(0.5, -125, 0.5, -40)
+                    rFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+                    Instance.new("UICorner", rFrame).CornerRadius = UDim.new(0, 8)
+                    
+                    local rInput = Instance.new("TextBox", rFrame)
+                    rInput.Size = UDim2.new(1, -20, 0, 40)
+                    rInput.Position = UDim2.new(0, 10, 0, 20)
+                    rInput.PlaceholderText = "اكتب الاسم الجديد واضغط السهم/Enter"
+                    rInput.Text = ""
+                    rInput.TextColor3 = Color3.new(1,1,1)
+                    rInput.BackgroundTransparency = 0.8
+                    
+                    rInput.FocusLost:Connect(function(enterPressed)
+                        if enterPressed and rInput.Text ~= "" then
+                            userAliases[username] = rInput.Text
+                            saveAliases()
+                            nameLabel.Text = "["..username.."] -> " .. rInput.Text
+                        end
+                        blur:Destroy()
+                        shadow:Destroy()
+                        frame.ZIndex = 1
+                        renameGui:Destroy()
+                    end)
+                    rInput:CaptureFocus()
+                end
+            end)
+        end
+    end)
+    
+    frame.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            isTouching = false
+        end
+    end)
+
+    return frame
+end
+
+-- نظام الأنميشن وإضافة الرسائل
+local function displayNewMessage(username, text, id)
+    if processedIds[id] then return end
+    processedIds[id] = true
+    
+    local newFrame = createMessageFrame(username, text, id)
+    
+    -- إعداد الأنميشن
+    local tweenInfo = TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    
+    if #activeMessages == 2 then
+        -- إذا كان هناك رسالتين، الرسالة السفلية [2] تنزل وتختفي
+        local bottomMsg = activeMessages[2]
+        TweenService:Create(bottomMsg, tweenInfo, {
+            Position = UDim2.new(0, 0, 0, 130),
+            BackgroundTransparency = 1
+        }):Play()
+        -- إخفاء النصوص داخل الرسالة السفلية
+        for _, child in ipairs(bottomMsg:GetChildren()) do
+            if child:IsA("TextLabel") then
+                TweenService:Create(child, tweenInfo, {TextTransparency = 1}):Play()
+            end
+        end
+        task.delay(0.4, function() bottomMsg:Destroy() end)
+        
+        -- الرسالة العلوية [1] تنزل لتصبح السفلية
+        local topMsg = activeMessages[1]
+        TweenService:Create(topMsg, tweenInfo, {Position = UDim2.new(0, 0, 0, 60)}):Play()
+        
+        -- إعداد الرسالة الجديدة كعلوية وتأتي من فوق
+        newFrame.Position = UDim2.new(0, 0, 0, -60)
+        TweenService:Create(newFrame, tweenInfo, {Position = UDim2.new(0, 0, 0, 0)}):Play()
+        
+        activeMessages[2] = activeMessages[1]
+        activeMessages[1] = newFrame
+
+    elseif #activeMessages == 1 then
+        -- الرسالة الأولى تنزل لتحت
+        local topMsg = activeMessages[1]
+        TweenService:Create(topMsg, tweenInfo, {Position = UDim2.new(0, 0, 0, 60)}):Play()
+        
+        -- الرسالة الجديدة تأتي من فوق
+        newFrame.Position = UDim2.new(0, 0, 0, -60)
+        TweenService:Create(newFrame, tweenInfo, {Position = UDim2.new(0, 0, 0, 0)}):Play()
+        
+        activeMessages[2] = activeMessages[1]
+        activeMessages[1] = newFrame
+        
+    else
+        -- أول رسالة تأتي من فوق
+        newFrame.Position = UDim2.new(0, 0, 0, -60)
+        TweenService:Create(newFrame, tweenInfo, {Position = UDim2.new(0, 0, 0, 0)}):Play()
+        activeMessages[1] = newFrame
+    end
+end
+
+-- وظيفة إرسال الرسائل إلى Cloudflare
+local function sendMessageToCloudflare(text)
+    -- حد سرعة الإرسال 0.25 ثانية
+    if tick() - lastMessageTime < 0.25 then return end
+    lastMessageTime = tick()
+    
+    local payload = HttpService:JSONEncode({
+        username = LocalPlayer.Name,
+        message = text
+    })
+    
+    task.spawn(function()
+        pcall(function()
+            requestFunc({
+                Url = WEBHOOK_URL,
+                Method = "POST",
+                Headers = {["Content-Type"] = "application/json"},
+                Body = payload
+            })
+        end)
+    end)
+end
+
+-- أزرار الإدخال والتواصل
+writeBtn.MouseButton1Click:Connect(function()
+    sendFrame.Visible = not sendFrame.Visible
+    if sendFrame.Visible then
+        msgInput:CaptureFocus()
+    end
+end)
+
+msgInput.FocusLost:Connect(function(enterPressed)
+    if enterPressed and msgInput.Text ~= "" then
+        sendMessageToCloudflare(msgInput.Text)
+        msgInput.Text = ""
+        sendFrame.Visible = false
+    end
+end)
+
+-- حلقة الفحص السريعة (Polling) بأقصى سرعة ممكنة دون باند
+task.spawn(function()
+    while task.wait(0.5) do -- يفحص كل نصف ثانية لاستقبال الرسائل بأسرع وقت
+        local success, response = pcall(function()
+            return requestFunc({Url = WEBHOOK_URL, Method = "GET"})
+        end)
+        
+        if success and response and response.StatusCode == 200 then
+            local dataSuccess, messages = pcall(function()
+                return HttpService:JSONDecode(response.Body)
+            end)
+            
+            if dataSuccess and type(messages) == "table" then
+                for _, msg in ipairs(messages) do
+                    -- التأكد من وجود البيانات وعدم تكرار عرض نفس الـ ID
+                    if msg.id and not processedIds[msg.id] then
+                        displayNewMessage(msg.username, msg.message, msg.id)
+                    end
+                end
+            end
+        end
+    end
+end)
