@@ -9,8 +9,11 @@ local SoundService = game:GetService("SoundService")
 local LocalPlayer = Players.LocalPlayer
 local requestFunc = request or http_request or syn.request
 
--- الرابط الخاص بالـ Webhook
-local WEBHOOK_URL = "https://proud-sound-77a5.hsynalhndawy2.workers.dev/"
+-- رابط الـ WebSocket (لاحظ: wss بدل https)
+local WEBHOOK_URL = "wss://proud-sound-77a5.hsynalhndawy2.workers.dev/"
+
+local socket = nil
+local isConnected = false
 
 -- نظام حفظ الأسماء المعدلة (Aliases)
 local aliasFileName = "ChatAliases.json"
@@ -315,7 +318,7 @@ local function displayNewMessage(username, text, id)
     end
 end
 
--- ====== إصلاح 3: JSONEncode داخل pcall جوه task.spawn عشان ما توقفش الإرسال ======
+-- ====== إرسال الرسالة عبر WebSocket بدل POST ======
 local function sendMessageToCloudflare(text)
     if tick() - lastMessageTime < 0.25 then return end
     lastMessageTime = tick()
@@ -333,13 +336,13 @@ local function sendMessageToCloudflare(text)
             return
         end
 
+        if not (socket and isConnected) then
+            warn("[Chat] مفيش اتصال حاليًا، الرسالة اتلغت")
+            return
+        end
+
         local ok, err = pcall(function()
-            requestFunc({
-                Url = WEBHOOK_URL,
-                Method = "POST",
-                Headers = {["Content-Type"] = "application/json"},
-                Body = payload
-            })
+            socket:Send(payload)
         end)
 
         if not ok then
@@ -383,33 +386,39 @@ toggleSizeBtn.MouseButton1Click:Connect(function()
     toggleSizeBtn.Text = isMinimized and "+" or "—"
 end)
 
--- الحلقة الأساسية لجلب الرسائل الجديدة كل 0.5 ثانية
-task.spawn(function()
-    while task.wait(0.5) do
-        local success, response = pcall(function()
-            local noCacheUrl = WEBHOOK_URL .. "?t=" .. tostring(tick())
-            return requestFunc({
-                Url = noCacheUrl, 
-                Method = "GET",
-                Headers = {
-                    ["Cache-Control"] = "no-cache",
-                    ["Pragma"] = "no-cache"
-                }
-            })
-        end)
-        
-        if success and response and response.StatusCode == 200 then
-            local dataSuccess, messages = pcall(function()
-                return HttpService:JSONDecode(response.Body)
-            end)
-            
-            if dataSuccess and type(messages) == "table" then
-                for _, msg in ipairs(messages) do
-                    if msg.id and not processedIds[msg.id] then
-                        displayNewMessage(msg.username, msg.message, msg.id)
-                    end
-                end
-            end
-        end
+-- ====== الاتصال بالسيرفر عبر WebSocket بدل الفحص المتكرر (Polling) ======
+local function connectWebSocket()
+    local ok, ws = pcall(function()
+        return WebSocket.connect(WEBHOOK_URL)
+    end)
+
+    if not ok or not ws then
+        warn("[Chat] فشل الاتصال، هيتم إعادة المحاولة بعد 2 ثانية")
+        isConnected = false
+        task.delay(2, connectWebSocket)
+        return
     end
-end)
+
+    socket = ws
+    isConnected = true
+    print("[Chat] تم الاتصال بنجاح")
+
+    socket.OnMessage:Connect(function(message)
+        local dataSuccess, msg = pcall(function()
+            return HttpService:JSONDecode(message)
+        end)
+
+        if dataSuccess and type(msg) == "table" and msg.id then
+            displayNewMessage(msg.username, msg.message, msg.id)
+        end
+    end)
+
+    socket.OnClose:Connect(function()
+        warn("[Chat] انقطع الاتصال، هيتم إعادة المحاولة بعد 2 ثانية")
+        isConnected = false
+        socket = nil
+        task.delay(2, connectWebSocket)
+    end)
+end
+
+connectWebSocket()
