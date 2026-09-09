@@ -4,6 +4,7 @@ local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local Lighting = game:GetService("Lighting")
+local SoundService = game:GetService("SoundService")
 
 local LocalPlayer = Players.LocalPlayer
 local requestFunc = request or http_request or syn.request
@@ -50,6 +51,40 @@ writeBtn.Font = Enum.Font.GothamBold
 writeBtn.TextSize = 16
 Instance.new("UICorner", writeBtn).CornerRadius = UDim.new(0, 8)
 writeBtn.Parent = sgui
+
+-- ====== دائرة التنبيه الحمراء (Unread Badge) ======
+local unreadBadge = Instance.new("Frame")
+unreadBadge.Size = UDim2.new(0, 20, 0, 20)
+unreadBadge.Position = UDim2.new(1, -10, 0, -8)
+unreadBadge.BackgroundColor3 = Color3.fromRGB(220, 40, 40)
+unreadBadge.BorderSizePixel = 0
+unreadBadge.Visible = false
+unreadBadge.ZIndex = 5
+Instance.new("UICorner", unreadBadge).CornerRadius = UDim.new(1, 0)
+unreadBadge.Parent = writeBtn
+
+local unreadLabel = Instance.new("TextLabel")
+unreadLabel.Size = UDim2.new(1, 0, 1, 0)
+unreadLabel.BackgroundTransparency = 1
+unreadLabel.TextColor3 = Color3.new(1, 1, 1)
+unreadLabel.Font = Enum.Font.GothamBold
+unreadLabel.TextSize = 12
+unreadLabel.Text = "0"
+unreadLabel.ZIndex = 6
+unreadLabel.Parent = unreadBadge
+
+local unreadCount = 0
+
+local function showUnread()
+    unreadCount += 1
+    unreadLabel.Text = unreadCount > 9 and "9+" or tostring(unreadCount)
+    unreadBadge.Visible = true
+end
+
+local function clearUnread()
+    unreadCount = 0
+    unreadBadge.Visible = false
+end
 
 -- ====== زرار تصغير الرسائل (جديد) ======
 local toggleSizeBtn = Instance.new("TextButton")
@@ -98,6 +133,18 @@ containerScale.Parent = messagesContainer
 local activeMessages = {}
 local lastMessageTime = 0
 local processedIds = {}
+
+-- ====== صوت التنبيه عند وصول رسالة جديدة ======
+local notifySound = Instance.new("Sound")
+notifySound.SoundId = "rbxassetid://243048703" -- صوت "ding" عام، غيّره لأي SoundId تفضله
+notifySound.Volume = 0.6
+notifySound.Parent = SoundService or workspace
+
+local function playNotifySound()
+    pcall(function()
+        notifySound:Play()
+    end)
+end
 
 local function createMessageFrame(username, text, id)
     local frame = Instance.new("Frame")
@@ -219,6 +266,12 @@ end
 local function displayNewMessage(username, text, id)
     if processedIds[id] then return end
     processedIds[id] = true
+
+    -- نشغّل الصوت والدائرة الحمراء بس لو الرسالة من شخص تاني، مش من نفسك
+    if username ~= LocalPlayer.Name then
+        playNotifySound()
+        showUnread()
+    end
     
     local newFrame = createMessageFrame(username, text, id)
     local tweenInfo = TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
@@ -299,6 +352,7 @@ writeBtn.MouseButton1Click:Connect(function()
     sendFrame.Visible = not sendFrame.Visible
     if sendFrame.Visible then
         msgInput:CaptureFocus()
+        clearUnread()
     end
 end)
 
