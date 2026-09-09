@@ -136,7 +136,7 @@ local processedIds = {}
 
 -- ====== صوت التنبيه عند وصول رسالة جديدة ======
 local notifySound = Instance.new("Sound")
-notifySound.SoundId = "rbxassetid://243048703" -- صوت "ding" عام، غيّره لأي SoundId تفضله
+notifySound.SoundId = "rbxassetid://6861693913"
 notifySound.Volume = 0.6
 notifySound.Parent = SoundService or workspace
 
