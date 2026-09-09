@@ -51,6 +51,18 @@ writeBtn.TextSize = 16
 Instance.new("UICorner", writeBtn).CornerRadius = UDim.new(0, 8)
 writeBtn.Parent = sgui
 
+-- ====== زرار تصغير الرسائل (جديد) ======
+local toggleSizeBtn = Instance.new("TextButton")
+toggleSizeBtn.Size = UDim2.new(0, 40, 0, 40)
+toggleSizeBtn.Position = UDim2.new(1, -160, 0, 55)
+toggleSizeBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+toggleSizeBtn.TextColor3 = Color3.new(1, 1, 1)
+toggleSizeBtn.Text = "—"
+toggleSizeBtn.Font = Enum.Font.GothamBold
+toggleSizeBtn.TextSize = 20
+Instance.new("UICorner", toggleSizeBtn).CornerRadius = UDim.new(0, 8)
+toggleSizeBtn.Parent = sgui
+
 local sendFrame = Instance.new("Frame")
 sendFrame.Size = UDim2.new(0, 300, 0, 50)
 sendFrame.Position = UDim2.new(0.5, -150, 0.5, -25)
@@ -71,11 +83,17 @@ msgInput.Font = Enum.Font.Gotham
 msgInput.TextSize = 14
 msgInput.Parent = sendFrame
 
+-- ====== حاوية الرسائل: نقلناها لأعلى الشاشة بعيدًا عن أزرار الحركة (تعديل) ======
 local messagesContainer = Instance.new("Frame")
 messagesContainer.Size = UDim2.new(0, 300, 0, 200)
-messagesContainer.Position = UDim2.new(0, 20, 0.5, -100)
+messagesContainer.Position = UDim2.new(0.5, -150, 0, 70)
 messagesContainer.BackgroundTransparency = 1
 messagesContainer.Parent = sgui
+
+-- UIScale يسمح لنا نصغّر كل الرسائل مرة واحدة بدون ما نلمس كل frame لوحده
+local containerScale = Instance.new("UIScale")
+containerScale.Scale = 1
+containerScale.Parent = messagesContainer
 
 local activeMessages = {}
 local lastMessageTime = 0
@@ -92,14 +110,11 @@ local function createMessageFrame(username, text, id)
     nameLabel.Position = UDim2.new(0, 5, 0, 2)
     nameLabel.BackgroundTransparency = 1
     nameLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-    
+
+    -- ====== إصلاح 2: عرض الاسم الجديد فقط بدل "القديم -> الجديد" ======
     local displayName = userAliases[username] or username
-    if userAliases[username] then
-        nameLabel.Text = "["..username.."] -> " .. displayName
-    else
-        nameLabel.Text = "["..username.."]"
-    end
-    
+    nameLabel.Text = "[" .. displayName .. "]"
+
     nameLabel.TextXAlignment = Enum.TextXAlignment.Left
     nameLabel.Font = Enum.Font.GothamBold
     nameLabel.TextSize = 12
@@ -121,14 +136,31 @@ local function createMessageFrame(username, text, id)
     
     local touchStartTime = 0
     local isTouching = false
-    
+
+    -- ====== إصلاح 1: تجاهل الضغطة لو صباعك اتحرك (يعني مشي مش ضغط ثابت) ======
     frame.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             isTouching = true
             touchStartTime = tick()
-            
+
+            local startPos = input.Position
+            local cancelled = false
+            local MOVE_THRESHOLD = 12 -- بكسل؛ لو اتحرك أكتر من كده يبقى مشي مش ضغط
+
+            local moveConn
+            moveConn = UserInputService.InputChanged:Connect(function(moveInput)
+                if moveInput.UserInputType == input.UserInputType then
+                    local delta = (moveInput.Position - startPos).Magnitude
+                    if delta > MOVE_THRESHOLD then
+                        cancelled = true
+                    end
+                end
+            end)
+
             task.delay(0.6, function()
-                if isTouching and (tick() - touchStartTime) >= 0.5 then
+                if moveConn then moveConn:Disconnect() end
+
+                if isTouching and not cancelled and (tick() - touchStartTime) >= 0.5 then
                     local blur = Instance.new("BlurEffect")
                     blur.Size = 15
                     blur.Name = "ChatBlur"
@@ -161,7 +193,8 @@ local function createMessageFrame(username, text, id)
                         if enterPressed and rInput.Text ~= "" then
                             userAliases[username] = rInput.Text
                             saveAliases()
-                            nameLabel.Text = "["..username.."] -> " .. rInput.Text
+                            -- ====== إصلاح 2: تحديث العرض بالاسم الجديد بالكامل ======
+                            nameLabel.Text = "[" .. rInput.Text .. "]"
                         end
                         blur:Destroy()
                         shadow:Destroy()
@@ -229,17 +262,25 @@ local function displayNewMessage(username, text, id)
     end
 end
 
+-- ====== إصلاح 3: JSONEncode داخل pcall جوه task.spawn عشان ما توقفش الإرسال ======
 local function sendMessageToCloudflare(text)
     if tick() - lastMessageTime < 0.25 then return end
     lastMessageTime = tick()
-    
-    local payload = HttpService:JSONEncode({
-        username = LocalPlayer.Name,
-        message = text
-    })
-    
+
     task.spawn(function()
-        pcall(function()
+        local encodeOk, payload = pcall(function()
+            return HttpService:JSONEncode({
+                username = LocalPlayer.Name,
+                message = text
+            })
+        end)
+
+        if not encodeOk then
+            warn("[Chat] فشل تجهيز الرسالة (ممكن يكون فيها رمز غير مدعوم):", payload)
+            return
+        end
+
+        local ok, err = pcall(function()
             requestFunc({
                 Url = WEBHOOK_URL,
                 Method = "POST",
@@ -247,6 +288,10 @@ local function sendMessageToCloudflare(text)
                 Body = payload
             })
         end)
+
+        if not ok then
+            warn("[Chat] فشل إرسال الرسالة:", err)
+        end
     end)
 end
 
@@ -257,19 +302,37 @@ writeBtn.MouseButton1Click:Connect(function()
     end
 end)
 
+-- ====== إصلاح 3 (تكملة): تصفير الصندوق دايمًا بغض النظر عن نجاح الإرسال ======
 msgInput.FocusLost:Connect(function(enterPressed)
     if enterPressed and msgInput.Text ~= "" then
         sendMessageToCloudflare(msgInput.Text)
-        msgInput.Text = ""
-        sendFrame.Visible = false
     end
+    -- السطرين دول بيتنفذوا دايمًا فورًا لأن sendMessageToCloudflare بقت غير معطّلة (async)
+    msgInput.Text = ""
+    sendFrame.Visible = false
 end)
 
--- الحل الجذري للمشكلة هنا: إضافة tick() لمنع التخزين المؤقت (Cache)
+-- ====== إصلاح 4: زرار تصغير/تكبير الرسائل ======
+local isMinimized = false
+local normalPos = messagesContainer.Position
+local minimizedPos = UDim2.new(1, -95, 0, 60) -- ركن أعلى يمين الشاشة، بعيد عن أزرار الحركة
+local normalScale = 1
+local minimizedScale = 0.4
+
+toggleSizeBtn.MouseButton1Click:Connect(function()
+    isMinimized = not isMinimized
+    local targetScale = isMinimized and minimizedScale or normalScale
+    local targetPos = isMinimized and minimizedPos or normalPos
+
+    TweenService:Create(containerScale, TweenInfo.new(0.3), {Scale = targetScale}):Play()
+    TweenService:Create(messagesContainer, TweenInfo.new(0.3), {Position = targetPos}):Play()
+    toggleSizeBtn.Text = isMinimized and "+" or "—"
+end)
+
+-- الحلقة الأساسية لجلب الرسائل الجديدة كل 0.5 ثانية
 task.spawn(function()
     while task.wait(0.5) do
         local success, response = pcall(function()
-            -- هكذا المحاكي سيظن أن الرابط يتغير كل نصف ثانية ولن يستخدم النسخة القديمة
             local noCacheUrl = WEBHOOK_URL .. "?t=" .. tostring(tick())
             return requestFunc({
                 Url = noCacheUrl, 
