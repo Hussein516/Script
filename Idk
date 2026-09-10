@@ -5,7 +5,6 @@ local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local Lighting = game:GetService("Lighting")
 local SoundService = game:GetService("SoundService")
-local ContentProvider = game:GetService("ContentProvider")
 
 local LocalPlayer = Players.LocalPlayer
 local requestFunc = request or http_request or syn.request
@@ -37,111 +36,6 @@ local function saveAliases()
     end
 end
 loadAliases()
-
--- ====== قائمة الملصقات (بتتحمل مباشرة من الروابط باستخدام getcustomasset) ======
-local stickerDefs = {
-    {id = "s1", file = "sticker_s1.jpg", url = "https://cdn.discordapp.com/attachments/1547421034959868036/1547422359038992394/3423f6565a58311984426499a98f8b98.jpg?ex=6aa35ce0&is=6aa20b60&hm=860f846d72bfc2e6566606d5aa45490377ae1452e9777db83440ea71ddd2cacc&"},
-    {id = "s2", file = "sticker_s2.jpg", url = "https://cdn.discordapp.com/attachments/1547421034959868036/1547422362654220319/c92f7ab228ae2d9ec8ab3bda6db3ce75.jpg?ex=6aa35ce0&is=6aa20b60&hm=983d443d5fe97cee9b57e38af0ec0b95f5d869e20f901944c98a9b1625b8d0c4&"},
-    {id = "s3", file = "sticker_s3.jpg", url = "https://cdn.discordapp.com/attachments/1547421034959868036/1547422499522744360/1c19ed5bdacecaf10e3777cef7ba452b.jpg?ex=6aa35d01&is=6aa20b81&hm=cf6dddc64835a954901b1b57298ba6121374a9e1239a44d3d3d21a16877c14d5&"},
-    {id = "s4", file = "sticker_s4.jpg", url = "https://cdn.discordapp.com/attachments/1547421034959868036/1547424590857510942/1b54a5fb9e5717ef1081009f92c978a1.jpg?ex=6aa35ef4&is=6aa20d74&hm=a3edb817a62ac7026c7400a4e9c36e083f0210e4931f1d63581aeb7bd765f7fd&"},
-    {id = "s5", file = "sticker_s5.jpg", url = "https://cdn.discordapp.com/attachments/1547421034959868036/1547424591344042014/04432c02ed51e2db6e5b9a5ee3a0bb5e.jpg?ex=6aa35ef4&is=6aa20d74&hm=375bfe32526ee0b737c8955f33049bf4d95b90e4c389811c5cbbbfb482b9b085&"},
-    {id = "s6", file = "sticker_s6.jpg", url = "https://cdn.discordapp.com/attachments/1547421034959868036/1547424591725731951/588bbac45b60bbcbc00d14d71d5d3750.jpg?ex=6aa35ef4&is=6aa20d74&hm=99a86df221fba0affd5ab2acbe4375371dc5260d34885770d3b6667437f9dd67&"},
-    {id = "s7", file = "sticker_s7.jpg", url = "https://cdn.discordapp.com/attachments/1547421034959868036/1547424592182648943/c37e1a6120e1fabd8f40345eb3e10e39.jpg?ex=6aa35ef4&is=6aa20d74&hm=4d17667b23a2a941cd471a7f7f3f5946dc73f543acec95477925742e568093e6&"},
-    {id = "s8", file = "sticker_s8.jpg", url = "https://cdn.discordapp.com/attachments/1547421034959868036/1547424592887423016/fa4cb4c1c33f886073c3fb62666018da.jpg?ex=6aa35ef4&is=6aa20d74&hm=7b93fcc74d0d342d33f6134456c08b2d31f0db6f9a682cf9752a9cdfface1c8e&"},
-    {id = "s9", file = "sticker_s9.jpg", url = "https://cdn.discordapp.com/attachments/1547421034959868036/1547424593319432242/157e379a22edf4ca09c4128ecc1bd86b.jpg?ex=6aa35ef4&is=6aa20d74&hm=23f0ecf2784f27f8b53217a360e6a87f904e9e9ccffc78b4b38ae2152fded46e&"},
-    {id = "s10", file = "sticker_s10.jpg", url = "https://cdn.discordapp.com/attachments/1547421034959868036/1547424593734537338/db3d1c9396abef2ea478744f8ff85e64.jpg?ex=6aa35ef4&is=6aa20d74&hm=437bebed82c7f97a9e2a25539033b0ffcaa93579e796a8e579b00e621f3bb6a6&"},
-    {id = "s11", file = "sticker_s11.jpg", url = "https://cdn.discordapp.com/attachments/1547421034959868036/1547424594481119252/8dadab433935be93e3422117decad7a7.jpg?ex=6aa35ef5&is=6aa20d75&hm=a39ca215d0c9a592445af42cac1004b7055cecf57ae94681f2ee6cf5e72b2b1d&"},
-    {id = "s12", file = "sticker_s12.jpg", url = "https://cdn.discordapp.com/attachments/1547421034959868036/1547424594753753139/e1b11e1fc6a80a0bfcb774e08e7d0135.jpg?ex=6aa35ef5&is=6aa20d75&hm=57f8c6d1b9ae1341c7e173de875d46887fc09824da24c38ea150e0a966221e8d&"},
-    {id = "s13", file = "sticker_s13.jpg", url = "https://cdn.discordapp.com/attachments/1547421034959868036/1547424648017485864/3cd8243bdadb3e49b59f0715f779ac68.jpg?ex=6aa35f01&is=6aa20d81&hm=c3d6d3ba9560e46a90fc8fd35815a63ed0799fe2b46b95a0991cd0881d42957c&"},
-    {id = "s14", file = "sticker_s14.jpg", url = "https://cdn.discordapp.com/attachments/1547421034959868036/1547424648382128158/7f4feab3f9b55c4640d09ac220cec938.jpg?ex=6aa35f01&is=6aa20d81&hm=9df280dd8b322b51c19691780c83b01d37b24b999b781b91ea9eaeb62dec729b&"},
-    {id = "s15", file = "sticker_s15.jpg", url = "https://cdn.discordapp.com/attachments/1547421034959868036/1547424648755552337/390d2e51d4b847412ed7cf686669af68.jpg?ex=6aa35f02&is=6aa20d82&hm=308c34a05fe38f168cc3254aef047c15e21f8361c328f14d802681635e3cb779&"},
-    {id = "s16", file = "sticker_s16.jpg", url = "https://cdn.discordapp.com/attachments/1547421034959868036/1547424649103806494/e5dd6427f53dcc4c8d3511aac87c9618.jpg?ex=6aa35f02&is=6aa20d82&hm=5bcdd04f9afc7c24a5519e5e4807aba6d6f6300ed7862152d4e7b708e39064cf&"},
-    {id = "s17", file = "sticker_s17.jpg", url = "https://cdn.discordapp.com/attachments/1547421034959868036/1547424649451937873/d8977a801f2cf0cb5dd991568d398333.jpg?ex=6aa35f02&is=6aa20d82&hm=f7e743d42706fde3a81d3aa6169ecf6d0038a5d8032be469b2e8213e6a5ee543&"},
-    {id = "s18", file = "sticker_s18.jpg", url = "https://cdn.discordapp.com/attachments/1547421034959868036/1547424649837674566/f650fa00dffb998be8213e4324e6b5ed.jpg?ex=6aa35f02&is=6aa20d82&hm=20193836e03fab1970129cf884a85f19b16dfb535041ac3da0d8050410c9e973&"},
-    {id = "s19", file = "sticker_s19.jpg", url = "https://cdn.discordapp.com/attachments/1547421034959868036/1547424650349248632/69d9617b97a326550c674ca0930dbfc3.jpg?ex=6aa35f02&is=6aa20d82&hm=de6eb8d4ddbdcd4cec3dce9ebd80bec0bbcccf94019d6ac56acffc9cda20aa18&"},
-    {id = "s20", file = "sticker_s20.jpg", url = "https://cdn.discordapp.com/attachments/1547421034959868036/1547424650689253386/7d3287c902030506e12aa43d8a595a03.jpg?ex=6aa35f02&is=6aa20d82&hm=0c7e7eddfe7ad44f3ef0b50b28e6ef18cb29631aebef4b75338adf04dbc9617e&"},
-    {id = "s21", file = "sticker_s21.jpg", url = "https://cdn.discordapp.com/attachments/1547421034959868036/1547424651125465168/cb9c418aac0111b7cacd56eac30c2dba.jpg?ex=6aa35f02&is=6aa20d82&hm=ec49e242673e1b454b2ae997fb38f3a4aaff794ede10c84f4d44a37ad06f685f&"},
-    {id = "s22", file = "sticker_s22.jpg", url = "https://cdn.discordapp.com/attachments/1547421034959868036/1547424651481718859/e57796a812c3d4ec282ee076194d8b05.jpg?ex=6aa35f02&is=6aa20d82&hm=c866b3ebcc4d855e01420a44d5a341cbd1f4f0ab1986ae794c80933e379b1d7d&"},
-    {id = "s23", file = "sticker_s23.jpg", url = "https://cdn.discordapp.com/attachments/1547421034959868036/1547425018990825583/24615da20766fd81390f3b880a076139.jpg?ex=6aa35f5a&is=6aa20dda&hm=afa9d0f12a436c5e684b8c7951bb6294a50d54c33c2ecfd9006eea3846ead7af&"},
-    {id = "s24", file = "sticker_s24.jpg", url = "https://cdn.discordapp.com/attachments/1547421034959868036/1547425019381026846/32b282034551df8de1692de8d7431bcb.jpg?ex=6aa35f5a&is=6aa20dda&hm=7eb6af3c33d0df9d63e1e5b49e0bbc80d08a0f6109f0de5fffb71d268a3e2436&"},
-    {id = "s25", file = "sticker_s25.jpg", url = "https://cdn.discordapp.com/attachments/1547421034959868036/1547425019771232347/3b4c9521ce4d74a450c278961f9e6278.jpg?ex=6aa35f5a&is=6aa20dda&hm=19dd9222cdd9ee3a2fbff98da81fc7e60b0f6078d6b9ad107ba78c603d60669c&"},
-    {id = "s26", file = "sticker_s26.jpg", url = "https://cdn.discordapp.com/attachments/1547421034959868036/1547425020064702514/6562ef7e222e8bf4e22d86fa704a0a3e.jpg?ex=6aa35f5a&is=6aa20dda&hm=8ac7a255b1f87a93d08dedbc846612c4d244d4d8e32ed8be18f4a2810699f37f&"},
-    {id = "s27", file = "sticker_s27.jpg", url = "https://cdn.discordapp.com/attachments/1547421034959868036/1547425020383334461/d27d6d04e7af7e55417fe3bc9cdae4b7.jpg?ex=6aa35f5a&is=6aa20dda&hm=0bb0079fb918d95f061685fc027a67c483c264ab9077261789a9b88d0bdf2ffd&"},
-    {id = "s28", file = "sticker_s28.jpg", url = "https://cdn.discordapp.com/attachments/1547421034959868036/1547425020685451326/d5ae7ee9190a1f63c2a558512b28146a.jpg?ex=6aa35f5a&is=6aa20dda&hm=6b4c45bde81644b1684ac146a45566bd6210ad2647e8833a16142b893049670c&"},
-    {id = "s29", file = "sticker_s29.jpg", url = "https://cdn.discordapp.com/attachments/1547421034959868036/1547425020937117726/0fe40f9919eaa1accd231dd6ab0f1d38.jpg?ex=6aa35f5a&is=6aa20dda&hm=00dedc2509559ee24d8917a361f3f97cabf683766e862e511096cb428cdd52aa&"},
-    {id = "s30", file = "sticker_s30.jpg", url = "https://cdn.discordapp.com/attachments/1547421034959868036/1547425021276721192/f9fa7d25c731df2af250ed237453d6ec.jpg?ex=6aa35f5a&is=6aa20dda&hm=d8e14485b183efd11d0474392123417b8572f4260446fbd166c9f07dfd57619e&"},
-    {id = "s31", file = "sticker_s31.jpg", url = "https://cdn.discordapp.com/attachments/1547421034959868036/1547425021536899143/8d7cf966d282ec0ed51930a64925c924.jpg?ex=6aa35f5a&is=6aa20dda&hm=1693c215ef608a746e46dc50a4d53d046cb9c998b2fe2c20d3689427a37dcf9d&"},
-    {id = "s32", file = "sticker_s32.jpg", url = "https://cdn.discordapp.com/attachments/1547421034959868036/1547425021864058921/6d44bd479e60993b7268d15048f46f40.jpg?ex=6aa35f5a&is=6aa20dda&hm=84a846f83a53e06d905c1a1fc10ea05bde49a85b69c38cb693e008577a53150c&"},
-    {id = "s33", file = "sticker_s33.jpg", url = "https://cdn.discordapp.com/attachments/1547421034959868036/1547425027933212852/3a07453fed5f3e16659d77c0eeedeb52.jpg?ex=6aa35f5c&is=6aa20ddc&hm=2329a670794d81dbc1dff950f16f2e74360dc0e57ad01c7a8b5117534baca526&"},
-    {id = "s34", file = "sticker_s34.jpg", url = "https://cdn.discordapp.com/attachments/1547421034959868036/1547425028188938341/1ca1a7a80418900b3653b88e466ad7c1.jpg?ex=6aa35f5c&is=6aa20ddc&hm=1095c1473506855c52a7b2d8810a704bdffb297f970375dceeba1ae209fb9d52&"},
-    {id = "s35", file = "sticker_s35.jpg", url = "https://cdn.discordapp.com/attachments/1547421034959868036/1547425028541382786/3263bd625760ded575dff5002631f052.jpg?ex=6aa35f5c&is=6aa20ddc&hm=3624bdaae632f45253fefa472f3d44da083f5bae270fa2170a66956a1474f85e&"},
-    {id = "s36", file = "sticker_s36.jpg", url = "https://cdn.discordapp.com/attachments/1547421034959868036/1547425028801560576/449637e9f613c1e109232bcda6de8c5b.jpg?ex=6aa35f5c&is=6aa20ddc&hm=6acb4d54ed61135b7dfa61303ef4e1a112e45611604155c4130e2483186955e3&"},
-    {id = "s37", file = "sticker_s37.jpg", url = "https://cdn.discordapp.com/attachments/1547421034959868036/1547425029111681115/435abe1010cc8352f3cb2068742cbd10.jpg?ex=6aa35f5c&is=6aa20ddc&hm=0af0643b487bfd2f2a332319d81582afa04a5c838ed3e3bd16dcb3a753e15a96&"},
-    {id = "s38", file = "sticker_s38.jpg", url = "https://cdn.discordapp.com/attachments/1547421034959868036/1547429076518830140/f0d5a1385c32330d1d7bc23d0c861d6d.jpg?ex=6aa36321&is=6aa211a1&hm=fd7fa0230036f8015a8e41f08125d7ca8e2aa9bda7ca37b7cd194ebab4eacab9&"},
-    {id = "s39", file = "sticker_s39.jpg", url = "https://cdn.discordapp.com/attachments/1547421034959868036/1547429076841660476/1a79606198aafdcdeb6a7d9ab6627153.jpg?ex=6aa36321&is=6aa211a1&hm=2850883d3a39c0549aa4a0565276d28dd7475aeab43069cdee3abab04beab18c&"},
-    {id = "s40", file = "sticker_s40.jpg", url = "https://cdn.discordapp.com/attachments/1547421034959868036/1547429077248376922/8e0eaed48c6310c2b9a101e2b87a01d2.jpg?ex=6aa36321&is=6aa211a1&hm=95244e229da2892f5254de55c599655839227c9f0dcc95b66e73ca074ef74a12&"},
-}
-
-local stickers = {}
-
--- تحميل صورة ملصق وحفظها محليًا لو مش موجودة، وتحويلها لصورة روبلوكس صالحة
-local function loadStickerImage(def)
-    local downloadOk = pcall(function()
-        if not isfile(def.file) then
-            local response = game:HttpGet(def.url)
-            writefile(def.file, response)
-        end
-    end)
-
-    if not downloadOk then
-        warn("[Chat] فشل تحميل الملصق:", def.id)
-        return nil
-    end
-
-    local assetOk, assetId = pcall(function()
-        return getcustomasset(def.file)
-    end)
-
-    if assetOk and assetId then
-        return assetId
-    end
-
-    warn("[Chat] فشل تحويل الملصق لصورة روبلوكس:", def.id)
-    return nil
-end
-
--- تحميل كل الملصقات فور تشغيل السكربت بالتوازي (أسرع بكتير من التحميل واحد ورا التاني)
-local pendingDownloads = #stickerDefs
-local downloadsDone = Instance.new("BindableEvent")
-local rawStickerResults = {}
-
-for i, def in ipairs(stickerDefs) do
-    task.spawn(function()
-        local assetId = loadStickerImage(def)
-        rawStickerResults[i] = assetId
-        pendingDownloads -= 1
-        if pendingDownloads <= 0 then
-            downloadsDone:Fire()
-        end
-    end)
-end
-
-if pendingDownloads > 0 then
-    downloadsDone.Event:Wait()
-end
-
-for i, def in ipairs(stickerDefs) do
-    if rawStickerResults[i] then
-        table.insert(stickers, {id = def.id, assetId = rawStickerResults[i]})
-    end
-end
-
-local function getStickerById(id)
-    for _, s in ipairs(stickers) do
-        if s.id == id then return s end
-    end
-    return nil
-end
 
 -- إعدادات الواجهة (GUI)
 local sgui = Instance.new("ScreenGui")
@@ -227,168 +121,6 @@ msgInput.Font = Enum.Font.Gotham
 msgInput.TextSize = 14
 msgInput.Parent = sendFrame
 
--- ====== زرار الملصقات: مربع صغير أسود مائل للرمادي، أعلى يمين صندوق الكتابة نفسه ======
-local stickerBtn = Instance.new("TextButton")
-stickerBtn.Size = UDim2.new(0, 28, 0, 28)
-stickerBtn.Position = UDim2.new(1, -34, 0, -34)
-stickerBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-stickerBtn.TextColor3 = Color3.new(1, 1, 1)
-stickerBtn.Text = "🖼"
-stickerBtn.Font = Enum.Font.GothamBold
-stickerBtn.TextSize = 14
-Instance.new("UICorner", stickerBtn).CornerRadius = UDim.new(0, 6)
-stickerBtn.Parent = sendFrame
-
--- ====== معاينة حية لمحتوى الرسالة (نص + ملصقات) قبل الإرسال ======
-local previewFrame = Instance.new("Frame")
-previewFrame.Size = UDim2.new(1, 0, 0, 30)
-previewFrame.Position = UDim2.new(0, 0, 1, 4)
-previewFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-previewFrame.Visible = false
-Instance.new("UICorner", previewFrame).CornerRadius = UDim.new(0, 6)
-previewFrame.Parent = sendFrame
-
--- ====== لوحة اختيار الملصقات (قابلة للتمرير، عريضة بدل طويلة) ======
-local stickerPanel = Instance.new("ScrollingFrame")
-stickerPanel.Size = UDim2.new(0, 300, 0, 170)
-stickerPanel.Position = UDim2.new(0.5, -150, 0.5, -85)
-stickerPanel.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
-stickerPanel.Visible = false
-stickerPanel.ScrollBarThickness = 6
-stickerPanel.ScrollBarImageColor3 = Color3.fromRGB(90, 150, 240)
-stickerPanel.CanvasSize = UDim2.new(0, 0, 0, 0)
-stickerPanel.AutomaticCanvasSize = Enum.AutomaticSize.Y
-Instance.new("UICorner", stickerPanel).CornerRadius = UDim.new(0, 12)
-stickerPanel.Parent = sgui
-
-local stickerPadding = Instance.new("UIPadding")
-stickerPadding.PaddingTop = UDim.new(0, 8)
-stickerPadding.PaddingBottom = UDim.new(0, 8)
-stickerPadding.PaddingLeft = UDim.new(0, 8)
-stickerPadding.PaddingRight = UDim.new(0, 8)
-stickerPadding.Parent = stickerPanel
-
-local stickerGrid = Instance.new("UIGridLayout")
-stickerGrid.CellSize = UDim2.new(0, 48, 0, 48)
-stickerGrid.CellPadding = UDim2.new(0, 6, 0, 6)
-stickerGrid.HorizontalAlignment = Enum.HorizontalAlignment.Center
-stickerGrid.SortOrder = Enum.SortOrder.LayoutOrder
-stickerGrid.Parent = stickerPanel
-
--- ====== تفريغ ورسم محتوى الرسالة (نص + ملصقات) داخل أي حاوية ======
-local function parseMessageSegments(text)
-    local segments = {}
-    local pos = 1
-    while true do
-        local startIdx, endIdx, stickerId = text:find("{{sticker:(%w+)}}", pos)
-        if not startIdx then
-            if pos <= #text then
-                table.insert(segments, {type = "text", value = text:sub(pos)})
-            end
-            break
-        end
-        if startIdx > pos then
-            table.insert(segments, {type = "text", value = text:sub(pos, startIdx - 1)})
-        end
-        table.insert(segments, {type = "sticker", value = stickerId})
-        pos = endIdx + 1
-    end
-    return segments
-end
-
-local function renderMessageContent(container, text, imgSize)
-    for _, child in ipairs(container:GetChildren()) do
-        if not child:IsA("UIListLayout") then
-            child:Destroy()
-        end
-    end
-
-    local layout = container:FindFirstChildOfClass("UIListLayout")
-    if not layout then
-        layout = Instance.new("UIListLayout")
-        layout.FillDirection = Enum.FillDirection.Horizontal
-        layout.VerticalAlignment = Enum.VerticalAlignment.Center
-        layout.Padding = UDim.new(0, 4)
-        layout.SortOrder = Enum.SortOrder.LayoutOrder
-        layout.Parent = container
-    end
-
-    local size = imgSize or 26
-    for _, seg in ipairs(parseMessageSegments(text)) do
-        if seg.type == "text" and seg.value ~= "" then
-            local lbl = Instance.new("TextLabel")
-            lbl.BackgroundTransparency = 1
-            lbl.AutomaticSize = Enum.AutomaticSize.X
-            lbl.Size = UDim2.new(0, 0, 1, 0)
-            lbl.TextColor3 = Color3.new(1, 1, 1)
-            lbl.Font = Enum.Font.Gotham
-            lbl.TextSize = 14
-            lbl.Text = seg.value
-            lbl.TextXAlignment = Enum.TextXAlignment.Left
-            lbl.Parent = container
-        elseif seg.type == "sticker" then
-            local sticker = getStickerById(seg.value)
-            if sticker then
-                local img = Instance.new("ImageLabel")
-                img.Size = UDim2.new(0, size, 0, size)
-                img.BackgroundTransparency = 1
-                img.Image = sticker.assetId
-                Instance.new("UICorner", img).CornerRadius = UDim.new(0, 8)
-                img.Parent = container
-            end
-        end
-    end
-end
-
--- ====== إدراج الملصق في مكان المؤشر بالظبط جوه صندوق الكتابة ======
-local function insertStickerAtCursor(stickerId)
-    local token = "{{sticker:" .. stickerId .. "}}"
-    local cursorPos = msgInput.CursorPosition
-    if not cursorPos or cursorPos < 1 then
-        cursorPos = #msgInput.Text + 1
-    end
-
-    local before = msgInput.Text:sub(1, cursorPos - 1)
-    local after = msgInput.Text:sub(cursorPos)
-    msgInput.Text = before .. token .. after
-    msgInput.CursorPosition = cursorPos + #token
-    msgInput:CaptureFocus()
-end
-
-for _, sticker in ipairs(stickers) do
-    local btn = Instance.new("ImageButton")
-    btn.Image = sticker.assetId
-    btn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 12)
-    btn.Parent = stickerPanel
-
-    btn.MouseButton1Click:Connect(function()
-        insertStickerAtCursor(sticker.id)
-        renderMessageContent(previewFrame, msgInput.Text, 22)
-        previewFrame.Visible = msgInput.Text ~= ""
-        -- كل اختيار ملصق = قفل اللوحة تلقائي
-        stickerPanel.Visible = false
-        -- نضمن رجوع التركيز لصندوق الكتابة فورًا (حتى لو Roblox فصلها للحظة عند الضغط)
-        task.defer(function()
-            msgInput:CaptureFocus()
-        end)
-    end)
-end
-
-stickerBtn.MouseButton1Click:Connect(function()
-    stickerPanel.Visible = not stickerPanel.Visible
-end)
-
--- تحديث المعاينة الحية كل ما يتغير النص (كتابة يدوية أو إدراج ملصق)
-msgInput:GetPropertyChangedSignal("Text"):Connect(function()
-    if msgInput.Text ~= "" then
-        renderMessageContent(previewFrame, msgInput.Text, 22)
-        previewFrame.Visible = true
-    else
-        previewFrame.Visible = false
-    end
-end)
-
 -- ====== حاوية الرسائل: نقلناها لأعلى الشاشة بعيدًا عن أزرار الحركة (تعديل) ======
 local messagesContainer = Instance.new("Frame")
 messagesContainer.Size = UDim2.new(0, 300, 0, 200)
@@ -419,7 +151,7 @@ end
 
 local function createMessageFrame(username, text, id)
     local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(1, 0, 0, 62)
+    frame.Size = UDim2.new(1, 0, 0, 50)
     frame.BackgroundColor3 = Color3.fromRGB(45, 60, 100)
     Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
     
@@ -438,27 +170,17 @@ local function createMessageFrame(username, text, id)
     nameLabel.TextSize = 12
     nameLabel.Parent = frame
     
-    local contentContainer = Instance.new("Frame")
-    contentContainer.Size = UDim2.new(1, -10, 0, 36)
-    contentContainer.Position = UDim2.new(0, 5, 0, 22)
-    contentContainer.BackgroundTransparency = 1
-    contentContainer.Parent = frame
-
-    renderMessageContent(contentContainer, text, 34)
-
-    -- ====== "تم الإرسال" رمادي تحت رسائلك انت بس ======
-    if username == LocalPlayer.Name then
-        local sentLabel = Instance.new("TextLabel")
-        sentLabel.Size = UDim2.new(0, 80, 0, 12)
-        sentLabel.Position = UDim2.new(1, -85, 1, -13)
-        sentLabel.BackgroundTransparency = 1
-        sentLabel.TextColor3 = Color3.fromRGB(160, 160, 160)
-        sentLabel.Font = Enum.Font.Gotham
-        sentLabel.TextSize = 10
-        sentLabel.TextXAlignment = Enum.TextXAlignment.Right
-        sentLabel.Text = "تم الإرسال"
-        sentLabel.Parent = frame
-    end
+    local textLabel = Instance.new("TextLabel")
+    textLabel.Size = UDim2.new(1, -10, 0, 25)
+    textLabel.Position = UDim2.new(0, 5, 0, 22)
+    textLabel.BackgroundTransparency = 1
+    textLabel.TextColor3 = Color3.new(1, 1, 1)
+    textLabel.Text = text
+    textLabel.TextWrapped = true
+    textLabel.TextXAlignment = Enum.TextXAlignment.Left
+    textLabel.Font = Enum.Font.Gotham
+    textLabel.TextSize = 14
+    textLabel.Parent = frame
     
     frame.Parent = messagesContainer
     
@@ -548,12 +270,10 @@ local function displayNewMessage(username, text, id)
     if processedIds[id] then return end
     processedIds[id] = true
 
-    -- الصوت بيشتغل دايمًا لو الرسالة من شخص تاني، بس الدائرة الحمراء بس لو الشات مقفول
+    -- نشغّل الصوت والدائرة الحمراء بس لو الرسالة من شخص تاني، مش من نفسك
     if username ~= LocalPlayer.Name then
         playNotifySound()
-        if not sendFrame.Visible then
-            showUnread()
-        end
+        showUnread()
     end
     
     local newFrame = createMessageFrame(username, text, id)
@@ -562,7 +282,7 @@ local function displayNewMessage(username, text, id)
     if #activeMessages == 2 then
         local bottomMsg = activeMessages[2]
         TweenService:Create(bottomMsg, tweenInfo, {
-            Position = UDim2.new(0, 0, 0, 144),
+            Position = UDim2.new(0, 0, 0, 130),
             BackgroundTransparency = 1
         }):Play()
         for _, child in ipairs(bottomMsg:GetChildren()) do
@@ -573,9 +293,9 @@ local function displayNewMessage(username, text, id)
         task.delay(0.4, function() bottomMsg:Destroy() end)
         
         local topMsg = activeMessages[1]
-        TweenService:Create(topMsg, tweenInfo, {Position = UDim2.new(0, 0, 0, 72)}):Play()
+        TweenService:Create(topMsg, tweenInfo, {Position = UDim2.new(0, 0, 0, 60)}):Play()
         
-        newFrame.Position = UDim2.new(0, 0, 0, -72)
+        newFrame.Position = UDim2.new(0, 0, 0, -60)
         TweenService:Create(newFrame, tweenInfo, {Position = UDim2.new(0, 0, 0, 0)}):Play()
         
         activeMessages[2] = activeMessages[1]
@@ -583,16 +303,16 @@ local function displayNewMessage(username, text, id)
 
     elseif #activeMessages == 1 then
         local topMsg = activeMessages[1]
-        TweenService:Create(topMsg, tweenInfo, {Position = UDim2.new(0, 0, 0, 72)}):Play()
+        TweenService:Create(topMsg, tweenInfo, {Position = UDim2.new(0, 0, 0, 60)}):Play()
         
-        newFrame.Position = UDim2.new(0, 0, 0, -72)
+        newFrame.Position = UDim2.new(0, 0, 0, -60)
         TweenService:Create(newFrame, tweenInfo, {Position = UDim2.new(0, 0, 0, 0)}):Play()
         
         activeMessages[2] = activeMessages[1]
         activeMessages[1] = newFrame
         
     else
-        newFrame.Position = UDim2.new(0, 0, 0, -72)
+        newFrame.Position = UDim2.new(0, 0, 0, -60)
         TweenService:Create(newFrame, tweenInfo, {Position = UDim2.new(0, 0, 0, 0)}):Play()
         activeMessages[1] = newFrame
     end
@@ -636,22 +356,17 @@ writeBtn.MouseButton1Click:Connect(function()
     if sendFrame.Visible then
         msgInput:CaptureFocus()
         clearUnread()
-    else
-        stickerPanel.Visible = false
-        previewFrame.Visible = false
     end
 end)
 
--- ====== إصلاح: متسكرش/تمسحش الكتابة إلا لو الإرسال فعلاً حصل (مش أي فقدان تركيز) ======
+-- ====== إصلاح 3 (تكملة): تصفير الصندوق دايمًا بغض النظر عن نجاح الإرسال ======
 msgInput.FocusLost:Connect(function(enterPressed)
     if enterPressed and msgInput.Text ~= "" then
         sendMessageToCloudflare(msgInput.Text)
-        msgInput.Text = ""
-        sendFrame.Visible = false
-        previewFrame.Visible = false
-        stickerPanel.Visible = false
     end
-    -- لو فقد التركيز لأي سبب تاني (زي الضغط على ملصق أو تمرير اللوحة) منقفلش ومنمسحش حاجة
+    -- السطرين دول بيتنفذوا دايمًا فورًا لأن sendMessageToCloudflare بقت غير معطّلة (async)
+    msgInput.Text = ""
+    sendFrame.Visible = false
 end)
 
 -- ====== إصلاح 4: زرار تصغير/تكبير الرسائل ======
