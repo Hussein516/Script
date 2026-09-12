@@ -9,13 +9,13 @@ local SoundService = game:GetService("SoundService")
 local LocalPlayer = Players.LocalPlayer
 local requestFunc = request or http_request or syn.request
 
--- رابط الـ WebSocket (لاحظ: wss بدل https)
 local WEBHOOK_URL = "wss://proud-sound-77a5.hsynalhndawy2.workers.dev/"
 
 local socket = nil
 local isConnected = false
+local connectWebSocket
+local reconnectDelay = 2
 
--- نظام حفظ الأسماء المعدلة (Aliases)
 local aliasFileName = "ChatAliases.json"
 local userAliases = {}
 
@@ -37,7 +37,6 @@ local function saveAliases()
 end
 loadAliases()
 
--- إعدادات الواجهة (GUI)
 local sgui = Instance.new("ScreenGui")
 sgui.Name = "DeltaChatProject"
 sgui.ResetOnSpawn = false
@@ -55,7 +54,6 @@ writeBtn.TextSize = 16
 Instance.new("UICorner", writeBtn).CornerRadius = UDim.new(0, 8)
 writeBtn.Parent = sgui
 
--- ====== دائرة التنبيه الحمراء (Unread Badge) ======
 local unreadBadge = Instance.new("Frame")
 unreadBadge.Size = UDim2.new(0, 20, 0, 20)
 unreadBadge.Position = UDim2.new(1, -10, 0, -8)
@@ -89,7 +87,6 @@ local function clearUnread()
     unreadBadge.Visible = false
 end
 
--- ====== زرار تصغير الرسائل (جديد) ======
 local toggleSizeBtn = Instance.new("TextButton")
 toggleSizeBtn.Size = UDim2.new(0, 40, 0, 40)
 toggleSizeBtn.Position = UDim2.new(1, -160, 0, 55)
@@ -100,6 +97,73 @@ toggleSizeBtn.Font = Enum.Font.GothamBold
 toggleSizeBtn.TextSize = 20
 Instance.new("UICorner", toggleSizeBtn).CornerRadius = UDim.new(0, 8)
 toggleSizeBtn.Parent = sgui
+
+local typingFrame = Instance.new("Frame")
+typingFrame.Size = UDim2.new(0, 260, 0, 26)
+typingFrame.Position = UDim2.new(0.5, -145, 0, 8)
+typingFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+Instance.new("UICorner", typingFrame).CornerRadius = UDim.new(0, 8)
+typingFrame.Parent = sgui
+
+local typingLabel = Instance.new("TextLabel")
+typingLabel.Size = UDim2.new(1, -10, 1, 0)
+typingLabel.Position = UDim2.new(0, 5, 0, 0)
+typingLabel.BackgroundTransparency = 1
+typingLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+typingLabel.Font = Enum.Font.Gotham
+typingLabel.TextSize = 13
+typingLabel.TextXAlignment = Enum.TextXAlignment.Left
+typingLabel.Text = ""
+typingLabel.Parent = typingFrame
+
+local hideTypingBtn = Instance.new("TextButton")
+hideTypingBtn.Size = UDim2.new(0, 26, 0, 26)
+hideTypingBtn.Position = UDim2.new(0.5, 120, 0, 8)
+hideTypingBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+hideTypingBtn.TextColor3 = Color3.new(1, 1, 1)
+hideTypingBtn.Text = "×"
+hideTypingBtn.Font = Enum.Font.GothamBold
+hideTypingBtn.TextSize = 16
+Instance.new("UICorner", hideTypingBtn).CornerRadius = UDim.new(0, 6)
+hideTypingBtn.Parent = sgui
+
+hideTypingBtn.MouseButton1Click:Connect(function()
+    typingFrame.Visible = false
+    hideTypingBtn.Visible = false
+end)
+
+local typingUsers = {}
+
+local function updateTypingLabelText()
+    local names = {}
+    for uname, _ in pairs(typingUsers) do
+        table.insert(names, userAliases[uname] or uname)
+    end
+    if #names == 0 then
+        typingLabel.Text = ""
+    elseif #names == 1 then
+        typingLabel.Text = names[1] .. " يكتب الآن..."
+    else
+        typingLabel.Text = table.concat(names, "، ") .. " يكتبون الآن..."
+    end
+end
+
+local isTypingSent = false
+local typingStopTask = nil
+
+local function sendTypingState(isTyping)
+    task.spawn(function()
+        pcall(function()
+            if socket and isConnected then
+                socket:Send(HttpService:JSONEncode({
+                    type = "typing",
+                    username = LocalPlayer.Name,
+                    typing = isTyping
+                }))
+            end
+        end)
+    end)
+end
 
 local sendFrame = Instance.new("Frame")
 sendFrame.Size = UDim2.new(0, 300, 0, 50)
@@ -121,14 +185,37 @@ msgInput.Font = Enum.Font.Gotham
 msgInput.TextSize = 14
 msgInput.Parent = sendFrame
 
--- ====== حاوية الرسائل: نقلناها لأعلى الشاشة بعيدًا عن أزرار الحركة (تعديل) ======
+msgInput:GetPropertyChangedSignal("Text"):Connect(function()
+    if msgInput.Text ~= "" then
+        if not isTypingSent then
+            isTypingSent = true
+            sendTypingState(true)
+        end
+        if typingStopTask then
+            task.cancel(typingStopTask)
+        end
+        typingStopTask = task.delay(3, function()
+            isTypingSent = false
+            sendTypingState(false)
+        end)
+    else
+        if isTypingSent then
+            isTypingSent = false
+            sendTypingState(false)
+        end
+        if typingStopTask then
+            task.cancel(typingStopTask)
+            typingStopTask = nil
+        end
+    end
+end)
+
 local messagesContainer = Instance.new("Frame")
 messagesContainer.Size = UDim2.new(0, 300, 0, 200)
 messagesContainer.Position = UDim2.new(0.5, -150, 0, 70)
 messagesContainer.BackgroundTransparency = 1
 messagesContainer.Parent = sgui
 
--- UIScale يسمح لنا نصغّر كل الرسائل مرة واحدة بدون ما نلمس كل frame لوحده
 local containerScale = Instance.new("UIScale")
 containerScale.Scale = 1
 containerScale.Parent = messagesContainer
@@ -136,8 +223,8 @@ containerScale.Parent = messagesContainer
 local activeMessages = {}
 local lastMessageTime = 0
 local processedIds = {}
+local messageFramesById = {}
 
--- ====== صوت التنبيه عند وصول رسالة جديدة ======
 local notifySound = Instance.new("Sound")
 notifySound.SoundId = "rbxassetid://6861693913"
 notifySound.Volume = 0.6
@@ -149,19 +236,36 @@ local function playNotifySound()
     end)
 end
 
+local function updateSeenLabel(entry)
+    local total = #entry.seenOrder
+    if total == 0 then
+        entry.seenLabel.Text = ""
+        return
+    end
+    local displayNames = {}
+    for i = 1, math.min(3, total) do
+        local uname = entry.seenOrder[i]
+        table.insert(displayNames, userAliases[uname] or uname)
+    end
+    local text = "شاهدها: " .. table.concat(displayNames, "، ")
+    if total > 3 then
+        text = text .. " وآخرون"
+    end
+    entry.seenLabel.Text = text
+end
+
 local function createMessageFrame(username, text, id)
     local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(1, 0, 0, 50)
+    frame.Size = UDim2.new(1, 0, 0, 64)
     frame.BackgroundColor3 = Color3.fromRGB(45, 60, 100)
     Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
-    
+
     local nameLabel = Instance.new("TextLabel")
     nameLabel.Size = UDim2.new(1, -10, 0, 20)
     nameLabel.Position = UDim2.new(0, 5, 0, 2)
     nameLabel.BackgroundTransparency = 1
     nameLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 
-    -- ====== إصلاح 2: عرض الاسم الجديد فقط بدل "القديم -> الجديد" ======
     local displayName = userAliases[username] or username
     nameLabel.Text = "[" .. displayName .. "]"
 
@@ -169,7 +273,7 @@ local function createMessageFrame(username, text, id)
     nameLabel.Font = Enum.Font.GothamBold
     nameLabel.TextSize = 12
     nameLabel.Parent = frame
-    
+
     local textLabel = Instance.new("TextLabel")
     textLabel.Size = UDim2.new(1, -10, 0, 25)
     textLabel.Position = UDim2.new(0, 5, 0, 22)
@@ -181,13 +285,32 @@ local function createMessageFrame(username, text, id)
     textLabel.Font = Enum.Font.Gotham
     textLabel.TextSize = 14
     textLabel.Parent = frame
-    
+
+    if username == LocalPlayer.Name then
+        local seenLabel = Instance.new("TextLabel")
+        seenLabel.Size = UDim2.new(1, -10, 0, 12)
+        seenLabel.Position = UDim2.new(0, 5, 1, -13)
+        seenLabel.BackgroundTransparency = 1
+        seenLabel.TextColor3 = Color3.fromRGB(160, 160, 160)
+        seenLabel.Font = Enum.Font.Gotham
+        seenLabel.TextSize = 10
+        seenLabel.TextXAlignment = Enum.TextXAlignment.Left
+        seenLabel.Text = ""
+        seenLabel.Parent = frame
+
+        local entry = { frame = frame, seenLabel = seenLabel, isOwn = true, seenSet = {}, seenOrder = {} }
+        messageFramesById[id] = entry
+
+        frame.Destroying:Connect(function()
+            messageFramesById[id] = nil
+        end)
+    end
+
     frame.Parent = messagesContainer
-    
+
     local touchStartTime = 0
     local isTouching = false
 
-    -- ====== إصلاح 1: تجاهل الضغطة لو صباعك اتحرك (يعني مشي مش ضغط ثابت) ======
     frame.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             isTouching = true
@@ -195,7 +318,7 @@ local function createMessageFrame(username, text, id)
 
             local startPos = input.Position
             local cancelled = false
-            local MOVE_THRESHOLD = 12 -- بكسل؛ لو اتحرك أكتر من كده يبقى مشي مش ضغط
+            local MOVE_THRESHOLD = 12
 
             local moveConn
             moveConn = UserInputService.InputChanged:Connect(function(moveInput)
@@ -215,35 +338,34 @@ local function createMessageFrame(username, text, id)
                     blur.Size = 15
                     blur.Name = "ChatBlur"
                     blur.Parent = Lighting
-                    
+
                     local shadow = Instance.new("UIStroke")
                     shadow.Thickness = 3
                     shadow.Color = Color3.new(0, 0, 0)
                     shadow.Transparency = 0.5
                     shadow.Parent = frame
-                    
+
                     frame.ZIndex = 10
-                    
+
                     local renameGui = Instance.new("ScreenGui", sgui)
                     local rFrame = Instance.new("Frame", renameGui)
                     rFrame.Size = UDim2.new(0, 250, 0, 80)
                     rFrame.Position = UDim2.new(0.5, -125, 0.5, -40)
                     rFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
                     Instance.new("UICorner", rFrame).CornerRadius = UDim.new(0, 8)
-                    
+
                     local rInput = Instance.new("TextBox", rFrame)
                     rInput.Size = UDim2.new(1, -20, 0, 40)
                     rInput.Position = UDim2.new(0, 10, 0, 20)
                     rInput.PlaceholderText = "اكتب الاسم الجديد واضغط السهم/Enter"
                     rInput.Text = ""
-                    rInput.TextColor3 = Color3.new(1,1,1)
+                    rInput.TextColor3 = Color3.new(1, 1, 1)
                     rInput.BackgroundTransparency = 0.8
-                    
+
                     rInput.FocusLost:Connect(function(enterPressed)
                         if enterPressed and rInput.Text ~= "" then
                             userAliases[username] = rInput.Text
                             saveAliases()
-                            -- ====== إصلاح 2: تحديث العرض بالاسم الجديد بالكامل ======
                             nameLabel.Text = "[" .. rInput.Text .. "]"
                         end
                         blur:Destroy()
@@ -256,7 +378,7 @@ local function createMessageFrame(username, text, id)
             end)
         end
     end)
-    
+
     frame.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             isTouching = false
@@ -270,19 +392,31 @@ local function displayNewMessage(username, text, id)
     if processedIds[id] then return end
     processedIds[id] = true
 
-    -- نشغّل الصوت والدائرة الحمراء بس لو الرسالة من شخص تاني، مش من نفسك
     if username ~= LocalPlayer.Name then
         playNotifySound()
-        showUnread()
+        if not (sendFrame.Visible and msgInput.Text ~= "") then
+            showUnread()
+        end
+        task.spawn(function()
+            pcall(function()
+                if socket and isConnected then
+                    socket:Send(HttpService:JSONEncode({
+                        type = "seen",
+                        messageId = id,
+                        username = LocalPlayer.Name
+                    }))
+                end
+            end)
+        end)
     end
-    
+
     local newFrame = createMessageFrame(username, text, id)
     local tweenInfo = TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-    
+
     if #activeMessages == 2 then
         local bottomMsg = activeMessages[2]
         TweenService:Create(bottomMsg, tweenInfo, {
-            Position = UDim2.new(0, 0, 0, 130),
+            Position = UDim2.new(0, 0, 0, 144),
             BackgroundTransparency = 1
         }):Play()
         for _, child in ipairs(bottomMsg:GetChildren()) do
@@ -291,34 +425,33 @@ local function displayNewMessage(username, text, id)
             end
         end
         task.delay(0.4, function() bottomMsg:Destroy() end)
-        
+
         local topMsg = activeMessages[1]
-        TweenService:Create(topMsg, tweenInfo, {Position = UDim2.new(0, 0, 0, 60)}):Play()
-        
-        newFrame.Position = UDim2.new(0, 0, 0, -60)
+        TweenService:Create(topMsg, tweenInfo, {Position = UDim2.new(0, 0, 0, 72)}):Play()
+
+        newFrame.Position = UDim2.new(0, 0, 0, -72)
         TweenService:Create(newFrame, tweenInfo, {Position = UDim2.new(0, 0, 0, 0)}):Play()
-        
+
         activeMessages[2] = activeMessages[1]
         activeMessages[1] = newFrame
 
     elseif #activeMessages == 1 then
         local topMsg = activeMessages[1]
-        TweenService:Create(topMsg, tweenInfo, {Position = UDim2.new(0, 0, 0, 60)}):Play()
-        
-        newFrame.Position = UDim2.new(0, 0, 0, -60)
+        TweenService:Create(topMsg, tweenInfo, {Position = UDim2.new(0, 0, 0, 72)}):Play()
+
+        newFrame.Position = UDim2.new(0, 0, 0, -72)
         TweenService:Create(newFrame, tweenInfo, {Position = UDim2.new(0, 0, 0, 0)}):Play()
-        
+
         activeMessages[2] = activeMessages[1]
         activeMessages[1] = newFrame
-        
+
     else
-        newFrame.Position = UDim2.new(0, 0, 0, -60)
+        newFrame.Position = UDim2.new(0, 0, 0, -72)
         TweenService:Create(newFrame, tweenInfo, {Position = UDim2.new(0, 0, 0, 0)}):Play()
         activeMessages[1] = newFrame
     end
 end
 
--- ====== إرسال الرسالة عبر WebSocket بدل POST ======
 local function sendMessageToCloudflare(text)
     if tick() - lastMessageTime < 0.25 then return end
     lastMessageTime = tick()
@@ -326,18 +459,19 @@ local function sendMessageToCloudflare(text)
     task.spawn(function()
         local encodeOk, payload = pcall(function()
             return HttpService:JSONEncode({
+                type = "message",
                 username = LocalPlayer.Name,
                 message = text
             })
         end)
 
         if not encodeOk then
-            warn("[Chat] فشل تجهيز الرسالة (ممكن يكون فيها رمز غير مدعوم):", payload)
+            warn("فشل تجهيز الرسالة", payload)
             return
         end
 
         if not (socket and isConnected) then
-            warn("[Chat] مفيش اتصال حاليًا، الرسالة اتلغت")
+            warn("مفيش اتصال حاليًا، الرسالة اتلغت")
             return
         end
 
@@ -346,7 +480,7 @@ local function sendMessageToCloudflare(text)
         end)
 
         if not ok then
-            warn("[Chat] فشل إرسال الرسالة:", err)
+            warn("فشل إرسال الرسالة", err)
         end
     end)
 end
@@ -359,20 +493,25 @@ writeBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- ====== إصلاح 3 (تكملة): تصفير الصندوق دايمًا بغض النظر عن نجاح الإرسال ======
 msgInput.FocusLost:Connect(function(enterPressed)
     if enterPressed and msgInput.Text ~= "" then
         sendMessageToCloudflare(msgInput.Text)
     end
-    -- السطرين دول بيتنفذوا دايمًا فورًا لأن sendMessageToCloudflare بقت غير معطّلة (async)
     msgInput.Text = ""
     sendFrame.Visible = false
+    if isTypingSent then
+        isTypingSent = false
+        sendTypingState(false)
+    end
+    if typingStopTask then
+        task.cancel(typingStopTask)
+        typingStopTask = nil
+    end
 end)
 
--- ====== إصلاح 4: زرار تصغير/تكبير الرسائل ======
 local isMinimized = false
 local normalPos = messagesContainer.Position
-local minimizedPos = UDim2.new(1, -95, 0, 60) -- ركن أعلى يمين الشاشة، بعيد عن أزرار الحركة
+local minimizedPos = UDim2.new(1, -95, 0, 60)
 local normalScale = 1
 local minimizedScale = 0.4
 
@@ -386,38 +525,62 @@ toggleSizeBtn.MouseButton1Click:Connect(function()
     toggleSizeBtn.Text = isMinimized and "+" or "—"
 end)
 
--- ====== الاتصال بالسيرفر عبر WebSocket بدل الفحص المتكرر (Polling) ======
-local function connectWebSocket()
+connectWebSocket = function()
     local ok, ws = pcall(function()
         return WebSocket.connect(WEBHOOK_URL)
     end)
 
     if not ok or not ws then
-        warn("[Chat] فشل الاتصال، هيتم إعادة المحاولة بعد 2 ثانية")
+        warn("فشل الاتصال، هيتم إعادة المحاولة بعد " .. reconnectDelay .. " ثانية")
         isConnected = false
-        task.delay(2, connectWebSocket)
+        task.delay(reconnectDelay, connectWebSocket)
+        reconnectDelay = reconnectDelay * 2
         return
     end
 
     socket = ws
     isConnected = true
-    print("[Chat] تم الاتصال بنجاح")
+    reconnectDelay = 2
+    print("تم الاتصال بنجاح")
 
     socket.OnMessage:Connect(function(message)
         local dataSuccess, msg = pcall(function()
             return HttpService:JSONDecode(message)
         end)
 
-        if dataSuccess and type(msg) == "table" and msg.id then
+        if not dataSuccess or type(msg) ~= "table" then
+            return
+        end
+
+        if msg.type == "typing" then
+            if msg.username and msg.username ~= LocalPlayer.Name then
+                if msg.typing then
+                    typingUsers[msg.username] = true
+                else
+                    typingUsers[msg.username] = nil
+                end
+                updateTypingLabelText()
+            end
+        elseif msg.type == "seen" then
+            if msg.messageId and msg.username and msg.username ~= LocalPlayer.Name then
+                local entry = messageFramesById[msg.messageId]
+                if entry and entry.isOwn and not entry.seenSet[msg.username] then
+                    entry.seenSet[msg.username] = true
+                    table.insert(entry.seenOrder, msg.username)
+                    updateSeenLabel(entry)
+                end
+            end
+        elseif msg.id then
             displayNewMessage(msg.username, msg.message, msg.id)
         end
     end)
 
     socket.OnClose:Connect(function()
-        warn("[Chat] انقطع الاتصال، هيتم إعادة المحاولة بعد 2 ثانية")
+        warn("انقطع الاتصال، هيتم إعادة المحاولة بعد " .. reconnectDelay .. " ثانية")
         isConnected = false
         socket = nil
-        task.delay(2, connectWebSocket)
+        task.delay(reconnectDelay, connectWebSocket)
+        reconnectDelay = reconnectDelay * 2
     end)
 end
 
