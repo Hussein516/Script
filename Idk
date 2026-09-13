@@ -10,11 +10,13 @@ local LocalPlayer = Players.LocalPlayer
 local requestFunc = request or http_request or syn.request
 
 local WEBHOOK_URL = "wss://proud-sound-77a5.hsynalhndawy2.workers.dev/"
+local OWNER_USERNAME = "maalek_1234"
 
 local socket = nil
 local isConnected = false
 local connectWebSocket
 local reconnectDelay = 2
+local isBannedFromChat = false
 
 local aliasFileName = "ChatAliases.json"
 local userAliases = {}
@@ -256,13 +258,43 @@ end
 
 local function createMessageFrame(username, text, id)
     local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(1, 0, 0, 64)
+    local isOwnerMsg = username == OWNER_USERNAME
+    frame.Size = UDim2.new(1, 0, 0, isOwnerMsg and 80 or 64)
     frame.BackgroundColor3 = Color3.fromRGB(45, 60, 100)
     Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
 
+    local nameLabelY = 2
+    if isOwnerMsg then
+        local ownerBadge = Instance.new("TextLabel")
+        ownerBadge.Size = UDim2.new(1, -10, 0, 16)
+        ownerBadge.Position = UDim2.new(0, 5, 0, 2)
+        ownerBadge.BackgroundTransparency = 1
+        ownerBadge.Font = Enum.Font.GothamBlack
+        ownerBadge.TextSize = 14
+        ownerBadge.TextXAlignment = Enum.TextXAlignment.Left
+        ownerBadge.Text = "⚡ MAALEK ⚡"
+        ownerBadge.TextColor3 = Color3.fromRGB(255, 255, 255)
+        ownerBadge.Parent = frame
+
+        local ownerGradient = Instance.new("UIGradient")
+        ownerGradient.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(180, 0, 0)),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(20, 20, 20)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(180, 0, 0))
+        })
+        ownerGradient.Parent = ownerBadge
+
+        local ownerStroke = Instance.new("UIStroke")
+        ownerStroke.Thickness = 1.2
+        ownerStroke.Color = Color3.fromRGB(0, 0, 0)
+        ownerStroke.Parent = ownerBadge
+
+        nameLabelY = 18
+    end
+
     local nameLabel = Instance.new("TextLabel")
     nameLabel.Size = UDim2.new(1, -10, 0, 20)
-    nameLabel.Position = UDim2.new(0, 5, 0, 2)
+    nameLabel.Position = UDim2.new(0, 5, 0, nameLabelY)
     nameLabel.BackgroundTransparency = 1
     nameLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 
@@ -276,7 +308,7 @@ local function createMessageFrame(username, text, id)
 
     local textLabel = Instance.new("TextLabel")
     textLabel.Size = UDim2.new(1, -10, 0, 25)
-    textLabel.Position = UDim2.new(0, 5, 0, 22)
+    textLabel.Position = UDim2.new(0, 5, 0, nameLabelY + 20)
     textLabel.BackgroundTransparency = 1
     textLabel.TextColor3 = Color3.new(1, 1, 1)
     textLabel.Text = text
@@ -416,7 +448,7 @@ local function displayNewMessage(username, text, id)
     if #activeMessages == 2 then
         local bottomMsg = activeMessages[2]
         TweenService:Create(bottomMsg, tweenInfo, {
-            Position = UDim2.new(0, 0, 0, 144),
+            Position = UDim2.new(0, 0, 0, 164),
             BackgroundTransparency = 1
         }):Play()
         for _, child in ipairs(bottomMsg:GetChildren()) do
@@ -427,9 +459,9 @@ local function displayNewMessage(username, text, id)
         task.delay(0.4, function() bottomMsg:Destroy() end)
 
         local topMsg = activeMessages[1]
-        TweenService:Create(topMsg, tweenInfo, {Position = UDim2.new(0, 0, 0, 72)}):Play()
+        TweenService:Create(topMsg, tweenInfo, {Position = UDim2.new(0, 0, 0, 84)}):Play()
 
-        newFrame.Position = UDim2.new(0, 0, 0, -72)
+        newFrame.Position = UDim2.new(0, 0, 0, -84)
         TweenService:Create(newFrame, tweenInfo, {Position = UDim2.new(0, 0, 0, 0)}):Play()
 
         activeMessages[2] = activeMessages[1]
@@ -437,16 +469,16 @@ local function displayNewMessage(username, text, id)
 
     elseif #activeMessages == 1 then
         local topMsg = activeMessages[1]
-        TweenService:Create(topMsg, tweenInfo, {Position = UDim2.new(0, 0, 0, 72)}):Play()
+        TweenService:Create(topMsg, tweenInfo, {Position = UDim2.new(0, 0, 0, 84)}):Play()
 
-        newFrame.Position = UDim2.new(0, 0, 0, -72)
+        newFrame.Position = UDim2.new(0, 0, 0, -84)
         TweenService:Create(newFrame, tweenInfo, {Position = UDim2.new(0, 0, 0, 0)}):Play()
 
         activeMessages[2] = activeMessages[1]
         activeMessages[1] = newFrame
 
     else
-        newFrame.Position = UDim2.new(0, 0, 0, -72)
+        newFrame.Position = UDim2.new(0, 0, 0, -84)
         TweenService:Create(newFrame, tweenInfo, {Position = UDim2.new(0, 0, 0, 0)}):Play()
         activeMessages[1] = newFrame
     end
@@ -493,8 +525,6 @@ writeBtn.MouseButton1Click:Connect(function()
     end
 end)
 
-local OWNER_USERNAME = "maalek_1234"
-
 local function sendKickCommand(target, reason)
     task.spawn(function()
         pcall(function()
@@ -513,7 +543,8 @@ end
 msgInput.FocusLost:Connect(function(enterPressed)
     if enterPressed and msgInput.Text ~= "" then
         local text = msgInput.Text
-        if LocalPlayer.Name == OWNER_USERNAME and text:sub(1, 6) == "/kick " then
+        local lowerText = text:lower()
+        if LocalPlayer.Name == OWNER_USERNAME and lowerText:sub(1, 6) == "/kick " then
             local rest = text:sub(7)
             local targetName, reason = rest:match("^(%S+)%s*(.*)$")
             if targetName and targetName ~= "" then
@@ -579,7 +610,35 @@ connectWebSocket = function()
         end
 
         if msg.error == "banned" or msg.error == "kicked" then
-            warn("تم طردك من الشات" .. (msg.reason and (": " .. msg.reason) or ""))
+            isBannedFromChat = true
+            pcall(function()
+                socket:Close()
+            end)
+            local banGui = Instance.new("ScreenGui")
+            banGui.Name = "DeltaChatBanned"
+            banGui.ResetOnSpawn = false
+            pcall(function() banGui.Parent = gethui() end)
+            if not banGui.Parent then banGui.Parent = game.CoreGui end
+
+            local banFrame = Instance.new("Frame")
+            banFrame.Size = UDim2.new(0, 280, 0, 90)
+            banFrame.Position = UDim2.new(0.5, -140, 0, 100)
+            banFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+            Instance.new("UICorner", banFrame).CornerRadius = UDim.new(0, 10)
+            banFrame.Parent = banGui
+
+            local banLabel = Instance.new("TextLabel")
+            banLabel.Size = UDim2.new(1, -20, 1, -20)
+            banLabel.Position = UDim2.new(0, 10, 0, 10)
+            banLabel.BackgroundTransparency = 1
+            banLabel.TextColor3 = Color3.fromRGB(255, 70, 70)
+            banLabel.Font = Enum.Font.GothamBold
+            banLabel.TextSize = 14
+            banLabel.TextWrapped = true
+            banLabel.Text = "تم حظرك من استخدام هذا الشات" .. (msg.reason and (": " .. msg.reason) or "")
+            banLabel.Parent = banFrame
+
+            sgui:Destroy()
         elseif msg.error == "links_not_allowed" then
             warn("مسموحش بإرسال روابط")
         elseif msg.type == "system" then
@@ -608,9 +667,12 @@ connectWebSocket = function()
     end)
 
     socket.OnClose:Connect(function()
-        warn("انقطع الاتصال، هيتم إعادة المحاولة بعد " .. reconnectDelay .. " ثانية")
         isConnected = false
         socket = nil
+        if isBannedFromChat then
+            return
+        end
+        warn("انقطع الاتصال، هيتم إعادة المحاولة بعد " .. reconnectDelay .. " ثانية")
         task.delay(reconnectDelay, connectWebSocket)
         reconnectDelay = reconnectDelay * 2
     end)
