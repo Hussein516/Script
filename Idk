@@ -5,8 +5,8 @@ local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local Lighting = game:GetService("Lighting")
 local SoundService = game:GetService("SoundService")
-
 local LocalPlayer = Players.LocalPlayer
+
 local requestFunc = request or http_request or syn.request
 
 local WEBHOOK_URL = "wss://proud-sound-77a5.hsynalhndawy2.workers.dev/"
@@ -37,6 +37,7 @@ local function saveAliases()
         writefile(aliasFileName, HttpService:JSONEncode(userAliases))
     end
 end
+
 loadAliases()
 
 local sgui = Instance.new("ScreenGui")
@@ -141,6 +142,7 @@ local function updateTypingLabelText()
     for uname, _ in pairs(typingUsers) do
         table.insert(names, userAliases[uname] or uname)
     end
+
     if #names == 0 then
         typingLabel.Text = ""
     elseif #names == 1 then
@@ -264,6 +266,7 @@ local function createMessageFrame(username, text, id)
     Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
 
     local nameLabelY = 2
+
     if isOwnerMsg then
         local ownerBadge = Instance.new("TextLabel")
         ownerBadge.Size = UDim2.new(1, -10, 0, 16)
@@ -297,10 +300,8 @@ local function createMessageFrame(username, text, id)
     nameLabel.Position = UDim2.new(0, 5, 0, nameLabelY)
     nameLabel.BackgroundTransparency = 1
     nameLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-
     local displayName = userAliases[username] or username
     nameLabel.Text = "[" .. displayName .. "]"
-
     nameLabel.TextXAlignment = Enum.TextXAlignment.Left
     nameLabel.Font = Enum.Font.GothamBold
     nameLabel.TextSize = 12
@@ -330,9 +331,14 @@ local function createMessageFrame(username, text, id)
         seenLabel.Text = ""
         seenLabel.Parent = frame
 
-        local entry = { frame = frame, seenLabel = seenLabel, isOwn = true, seenSet = {}, seenOrder = {} }
+        local entry = {
+            frame = frame,
+            seenLabel = seenLabel,
+            isOwn = true,
+            seenSet = {},
+            seenOrder = {}
+        }
         messageFramesById[id] = entry
-
         frame.Destroying:Connect(function()
             messageFramesById[id] = nil
         end)
@@ -347,12 +353,11 @@ local function createMessageFrame(username, text, id)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             isTouching = true
             touchStartTime = tick()
-
             local startPos = input.Position
             local cancelled = false
             local MOVE_THRESHOLD = 12
-
             local moveConn
+
             moveConn = UserInputService.InputChanged:Connect(function(moveInput)
                 if moveInput.UserInputType == input.UserInputType then
                     local delta = (moveInput.Position - startPos).Magnitude
@@ -364,7 +369,6 @@ local function createMessageFrame(username, text, id)
 
             task.delay(0.6, function()
                 if moveConn then moveConn:Disconnect() end
-
                 if isTouching and not cancelled and (tick() - touchStartTime) >= 0.5 then
                     local blur = Instance.new("BlurEffect")
                     blur.Size = 15
@@ -447,39 +451,36 @@ local function displayNewMessage(username, text, id)
 
     if #activeMessages == 2 then
         local bottomMsg = activeMessages[2]
-        TweenService:Create(bottomMsg, tweenInfo, {
-            Position = UDim2.new(0, 0, 0, 164),
-            BackgroundTransparency = 1
-        }):Play()
+        TweenService:Create(bottomMsg, tweenInfo, { Position = UDim2.new(0, 0, 0, 164), BackgroundTransparency = 1 }):Play()
         for _, child in ipairs(bottomMsg:GetChildren()) do
             if child:IsA("TextLabel") then
-                TweenService:Create(child, tweenInfo, {TextTransparency = 1}):Play()
+                TweenService:Create(child, tweenInfo, { TextTransparency = 1 }):Play()
             end
         end
-        task.delay(0.4, function() bottomMsg:Destroy() end)
+        task.delay(0.4, function()
+            bottomMsg:Destroy()
+        end)
 
         local topMsg = activeMessages[1]
-        TweenService:Create(topMsg, tweenInfo, {Position = UDim2.new(0, 0, 0, 84)}):Play()
+        TweenService:Create(topMsg, tweenInfo, { Position = UDim2.new(0, 0, 0, 84) }):Play()
 
         newFrame.Position = UDim2.new(0, 0, 0, -84)
-        TweenService:Create(newFrame, tweenInfo, {Position = UDim2.new(0, 0, 0, 0)}):Play()
+        TweenService:Create(newFrame, tweenInfo, { Position = UDim2.new(0, 0, 0, 0) }):Play()
 
         activeMessages[2] = activeMessages[1]
         activeMessages[1] = newFrame
-
     elseif #activeMessages == 1 then
         local topMsg = activeMessages[1]
-        TweenService:Create(topMsg, tweenInfo, {Position = UDim2.new(0, 0, 0, 84)}):Play()
+        TweenService:Create(topMsg, tweenInfo, { Position = UDim2.new(0, 0, 0, 84) }):Play()
 
         newFrame.Position = UDim2.new(0, 0, 0, -84)
-        TweenService:Create(newFrame, tweenInfo, {Position = UDim2.new(0, 0, 0, 0)}):Play()
+        TweenService:Create(newFrame, tweenInfo, { Position = UDim2.new(0, 0, 0, 0) }):Play()
 
         activeMessages[2] = activeMessages[1]
         activeMessages[1] = newFrame
-
     else
         newFrame.Position = UDim2.new(0, 0, 0, -84)
-        TweenService:Create(newFrame, tweenInfo, {Position = UDim2.new(0, 0, 0, 0)}):Play()
+        TweenService:Create(newFrame, tweenInfo, { Position = UDim2.new(0, 0, 0, 0) }):Play()
         activeMessages[1] = newFrame
     end
 end
@@ -496,21 +497,17 @@ local function sendMessageToCloudflare(text)
                 message = text
             })
         end)
-
         if not encodeOk then
             warn("فشل تجهيز الرسالة", payload)
             return
         end
-
         if not (socket and isConnected) then
             warn("مفيش اتصال حاليًا، الرسالة اتلغت")
             return
         end
-
         local ok, err = pcall(function()
             socket:Send(payload)
         end)
-
         if not ok then
             warn("فشل إرسال الرسالة", err)
         end
@@ -525,37 +522,17 @@ writeBtn.MouseButton1Click:Connect(function()
     end
 end)
 
-local function sendKickCommand(target, reason)
-    task.spawn(function()
-        pcall(function()
-            if socket and isConnected then
-                socket:Send(HttpService:JSONEncode({
-                    type = "kick",
-                    requester = LocalPlayer.Name,
-                    target = target,
-                    reason = reason
-                }))
-            end
-        end)
-    end)
-end
-
+-- ==========================================================
+-- ==== إرسال الرسائل: كل حاجة تتبعت للسيرفر (حتى /kick) ====
+-- ==========================================================
 msgInput.FocusLost:Connect(function(enterPressed)
     if enterPressed and msgInput.Text ~= "" then
-        local text = msgInput.Text
-        local lowerText = text:lower()
-        if LocalPlayer.Name == OWNER_USERNAME and lowerText:sub(1, 6) == "/kick " then
-            local rest = text:sub(7)
-            local targetName, reason = rest:match("^(%S+)%s*(.*)$")
-            if targetName and targetName ~= "" then
-                sendKickCommand(targetName, reason)
-            end
-        else
-            sendMessageToCloudflare(text)
-        end
+        -- نرسل النص كما هو. السيرفر هو اللي يتحقق من الأونر ويوزع أوامر الطرد.
+        sendMessageToCloudflare(msgInput.Text)
     end
     msgInput.Text = ""
     sendFrame.Visible = false
+
     if isTypingSent then
         isTypingSent = false
         sendTypingState(false)
@@ -577,8 +554,8 @@ toggleSizeBtn.MouseButton1Click:Connect(function()
     local targetScale = isMinimized and minimizedScale or normalScale
     local targetPos = isMinimized and minimizedPos or normalPos
 
-    TweenService:Create(containerScale, TweenInfo.new(0.3), {Scale = targetScale}):Play()
-    TweenService:Create(messagesContainer, TweenInfo.new(0.3), {Position = targetPos}):Play()
+    TweenService:Create(containerScale, TweenInfo.new(0.3), { Scale = targetScale }):Play()
+    TweenService:Create(messagesContainer, TweenInfo.new(0.3), { Position = targetPos }):Play()
     toggleSizeBtn.Text = isMinimized and "+" or "—"
 end)
 
@@ -586,7 +563,6 @@ connectWebSocket = function()
     local ok, ws = pcall(function()
         return WebSocket.connect(WEBHOOK_URL)
     end)
-
     if not ok or not ws then
         warn("فشل الاتصال، هيتم إعادة المحاولة بعد " .. reconnectDelay .. " ثانية")
         isConnected = false
@@ -604,43 +580,30 @@ connectWebSocket = function()
         local dataSuccess, msg = pcall(function()
             return HttpService:JSONDecode(message)
         end)
+        if not dataSuccess or type(msg) ~= "table" then return end
 
-        if not dataSuccess or type(msg) ~= "table" then
-            return
-        end
-
-        if msg.error == "banned" or msg.error == "kicked" then
-            isBannedFromChat = true
-            pcall(function()
-                socket:Close()
-            end)
-            local banGui = Instance.new("ScreenGui")
-            banGui.Name = "DeltaChatBanned"
-            banGui.ResetOnSpawn = false
-            pcall(function() banGui.Parent = gethui() end)
-            if not banGui.Parent then banGui.Parent = game.CoreGui end
-
-            local banFrame = Instance.new("Frame")
-            banFrame.Size = UDim2.new(0, 280, 0, 90)
-            banFrame.Position = UDim2.new(0.5, -140, 0, 100)
-            banFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-            Instance.new("UICorner", banFrame).CornerRadius = UDim.new(0, 10)
-            banFrame.Parent = banGui
-
-            local banLabel = Instance.new("TextLabel")
-            banLabel.Size = UDim2.new(1, -20, 1, -20)
-            banLabel.Position = UDim2.new(0, 10, 0, 10)
-            banLabel.BackgroundTransparency = 1
-            banLabel.TextColor3 = Color3.fromRGB(255, 70, 70)
-            banLabel.Font = Enum.Font.GothamBold
-            banLabel.TextSize = 14
-            banLabel.TextWrapped = true
-            banLabel.Text = "تم حظرك من استخدام هذا الشات" .. (msg.reason and (": " .. msg.reason) or "")
-            banLabel.Parent = banFrame
-
-            sgui:Destroy()
+        -- ==========================================================
+        -- ==== معالجة أمر الطرد القادم من السيرفر (طرد محلي فقط) ====
+        -- ==========================================================
+        if msg.error == "kicked" then
+            -- نتحقق إن الهدف هو أنا
+            if msg.target and msg.target:lower() == LocalPlayer.Name:lower() then
+                isBannedFromChat = true
+                pcall(function() socket:Close() end)
+                task.wait(0.1)
+                local kickReason = (msg.reason and msg.reason ~= "" and msg.reason) or "لقد قمت بطرد نفسي بنفسي."
+                game:GetService("Players").LocalPlayer:Kick(kickReason)
+                return
+            end
+        elseif msg.error == "banned" then
+            -- لو حبيت تستخدم الحظر الدائم، ضيف كوده هنا. حاليًا نتجاهله.
+            warn("تم إعلامك بحظر، لكن النظام الحالي بيستخدم الطرد فقط.")
+        elseif msg.error == "not_allowed" then
+            warn("مش مسموحلك تستخدم الأمر ده.")
         elseif msg.error == "links_not_allowed" then
             warn("مسموحش بإرسال روابط")
+        elseif msg.error == "rate_limited" then
+            warn("عامل spam كتير، استنى شوية.")
         elseif msg.type == "system" then
             warn(msg.message or "")
         elseif msg.type == "typing" then
@@ -669,9 +632,7 @@ connectWebSocket = function()
     socket.OnClose:Connect(function()
         isConnected = false
         socket = nil
-        if isBannedFromChat then
-            return
-        end
+        if isBannedFromChat then return end
         warn("انقطع الاتصال، هيتم إعادة المحاولة بعد " .. reconnectDelay .. " ثانية")
         task.delay(reconnectDelay, connectWebSocket)
         reconnectDelay = reconnectDelay * 2
