@@ -493,9 +493,35 @@ writeBtn.MouseButton1Click:Connect(function()
     end
 end)
 
+local OWNER_USERNAME = "maalek_1234"
+
+local function sendKickCommand(target, reason)
+    task.spawn(function()
+        pcall(function()
+            if socket and isConnected then
+                socket:Send(HttpService:JSONEncode({
+                    type = "kick",
+                    requester = LocalPlayer.Name,
+                    target = target,
+                    reason = reason
+                }))
+            end
+        end)
+    end)
+end
+
 msgInput.FocusLost:Connect(function(enterPressed)
     if enterPressed and msgInput.Text ~= "" then
-        sendMessageToCloudflare(msgInput.Text)
+        local text = msgInput.Text
+        if LocalPlayer.Name == OWNER_USERNAME and text:sub(1, 6) == "/kick " then
+            local rest = text:sub(7)
+            local targetName, reason = rest:match("^(%S+)%s*(.*)$")
+            if targetName and targetName ~= "" then
+                sendKickCommand(targetName, reason)
+            end
+        else
+            sendMessageToCloudflare(text)
+        end
     end
     msgInput.Text = ""
     sendFrame.Visible = false
@@ -552,7 +578,13 @@ connectWebSocket = function()
             return
         end
 
-        if msg.type == "typing" then
+        if msg.error == "banned" or msg.error == "kicked" then
+            warn("تم طردك من الشات" .. (msg.reason and (": " .. msg.reason) or ""))
+        elseif msg.error == "links_not_allowed" then
+            warn("مسموحش بإرسال روابط")
+        elseif msg.type == "system" then
+            warn(msg.message or "")
+        elseif msg.type == "typing" then
             if msg.username and msg.username ~= LocalPlayer.Name then
                 if msg.typing then
                     typingUsers[msg.username] = true
