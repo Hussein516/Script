@@ -1,0 +1,703 @@
+local HttpService = game:GetService("HttpService")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local Players = game:GetService("Players")
+local Lighting = game:GetService("Lighting")
+local SoundService = game:GetService("SoundService")
+
+local LocalPlayer = Players.LocalPlayer
+
+local WEBHOOK_URL = "wss://proud-sound-77a5.hsynalhndawy2.workers.dev/"
+local OWNER_USERNAME = "maalek_1234"
+local RECONNECT_MAX = 30
+local TOKEN_FILE = "OwnerToken.txt"
+
+local socket = nil
+local isConnected = false
+local reconnectDelay = 2
+local isBannedFromChat = false
+local hasAuthed = false
+
+local function loadOwnerToken()
+    if isfile and isfile(TOKEN_FILE) then
+        local ok, content = pcall(readfile, TOKEN_FILE)
+        if ok and type(content) == "string" then
+            local cleaned = content:gsub("%s+", "")
+            if #cleaned > 0 then
+                return cleaned
+            end
+        end
+    end
+
+    if type(_G) == "table" and type(_G.OWNER_TOKEN) == "string" and #_G.OWNER_TOKEN > 0 then
+        return _G.OWNER_TOKEN
+    end
+
+    return nil
+end
+
+local OWNER_TOKEN = loadOwnerToken()
+
+if OWNER_TOKEN then
+    print("[Chat] تم تحميل توكن المالك من " .. TOKEN_FILE)
+else
+    print("[Chat] ما لقيتش " .. TOKEN_FILE .. " - هتشتغل كلاعب عادي")
+end
+
+local aliasFileName = "ChatAliases.json"
+local userAliases = {}
+
+local function loadAliases()
+    if isfile and isfile(aliasFileName) then
+        local ok, data = pcall(function()
+            return HttpService:JSONDecode(readfile(aliasFileName))
+        end)
+        if ok and type(data) == "table" then
+            userAliases = data
+        end
+    end
+end
+
+local function saveAliases()
+    if writefile then
+        pcall(function()
+            writefile(aliasFileName, HttpService:JSONEncode(userAliases))
+        end)
+    end
+end
+
+loadAliases()
+
+local sgui = Instance.new("ScreenGui")
+sgui.Name = "DeltaChatProject"
+sgui.ResetOnSpawn = false
+pcall(function() sgui.Parent = gethui() end)
+if not sgui.Parent then sgui.Parent = game.CoreGui end
+
+local writeBtn = Instance.new("TextButton")
+writeBtn.Size = UDim2.new(0, 150, 0, 40)
+writeBtn.Position = UDim2.new(1, -160, 0, 10)
+writeBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+writeBtn.TextColor3 = Color3.new(1, 1, 1)
+writeBtn.Text = "اكتب رسالتك"
+writeBtn.Font = Enum.Font.GothamBold
+writeBtn.TextSize = 16
+Instance.new("UICorner", writeBtn).CornerRadius = UDim.new(0, 8)
+writeBtn.Parent = sgui
+
+local unreadBadge = Instance.new("Frame")
+unreadBadge.Size = UDim2.new(0, 20, 0, 20)
+unreadBadge.Position = UDim2.new(1, -10, 0, -8)
+unreadBadge.BackgroundColor3 = Color3.fromRGB(220, 40, 40)
+unreadBadge.BorderSizePixel = 0
+unreadBadge.Visible = false
+unreadBadge.ZIndex = 5
+Instance.new("UICorner", unreadBadge).CornerRadius = UDim.new(1, 0)
+unreadBadge.Parent = writeBtn
+
+local unreadLabel = Instance.new("TextLabel")
+unreadLabel.Size = UDim2.new(1, 0, 1, 0)
+unreadLabel.BackgroundTransparency = 1
+unreadLabel.TextColor3 = Color3.new(1, 1, 1)
+unreadLabel.Font = Enum.Font.GothamBold
+unreadLabel.TextSize = 12
+unreadLabel.Text = "0"
+unreadLabel.ZIndex = 6
+unreadLabel.Parent = unreadBadge
+
+local unreadCount = 0
+local function showUnread()
+    unreadCount += 1
+    unreadLabel.Text = unreadCount > 9 and "9+" or tostring(unreadCount)
+    unreadBadge.Visible = true
+end
+local function clearUnread()
+    unreadCount = 0
+    unreadBadge.Visible = false
+end
+
+local toggleSizeBtn = Instance.new("TextButton")
+toggleSizeBtn.Size = UDim2.new(0, 40, 0, 40)
+toggleSizeBtn.Position = UDim2.new(1, -160, 0, 55)
+toggleSizeBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+toggleSizeBtn.TextColor3 = Color3.new(1, 1, 1)
+toggleSizeBtn.Text = "-"
+toggleSizeBtn.Font = Enum.Font.GothamBold
+toggleSizeBtn.TextSize = 20
+Instance.new("UICorner", toggleSizeBtn).CornerRadius = UDim.new(0, 8)
+toggleSizeBtn.Parent = sgui
+
+local typingFrame = Instance.new("Frame")
+typingFrame.Size = UDim2.new(0, 260, 0, 26)
+typingFrame.Position = UDim2.new(0.5, -145, 0, 8)
+typingFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+Instance.new("UICorner", typingFrame).CornerRadius = UDim.new(0, 8)
+typingFrame.Parent = sgui
+
+local typingLabel = Instance.new("TextLabel")
+typingLabel.Size = UDim2.new(1, -10, 1, 0)
+typingLabel.Position = UDim2.new(0, 5, 0, 0)
+typingLabel.BackgroundTransparency = 1
+typingLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+typingLabel.Font = Enum.Font.Gotham
+typingLabel.TextSize = 13
+typingLabel.TextXAlignment = Enum.TextXAlignment.Left
+typingLabel.Text = ""
+typingLabel.Parent = typingFrame
+
+local hideTypingBtn = Instance.new("TextButton")
+hideTypingBtn.Size = UDim2.new(0, 26, 0, 26)
+hideTypingBtn.Position = UDim2.new(0.5, 120, 0, 8)
+hideTypingBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+hideTypingBtn.TextColor3 = Color3.new(1, 1, 1)
+hideTypingBtn.Text = "x"
+hideTypingBtn.Font = Enum.Font.GothamBold
+hideTypingBtn.TextSize = 16
+Instance.new("UICorner", hideTypingBtn).CornerRadius = UDim.new(0, 6)
+hideTypingBtn.Parent = sgui
+hideTypingBtn.MouseButton1Click:Connect(function()
+    typingFrame.Visible = false
+    hideTypingBtn.Visible = false
+end)
+
+local typingUsers = {}
+local function updateTypingLabelText()
+    local names = {}
+    for uname, _ in pairs(typingUsers) do
+        table.insert(names, userAliases[uname] or uname)
+    end
+    if #names == 0 then
+        typingLabel.Text = ""
+    elseif #names == 1 then
+        typingLabel.Text = names[1] .. " يكتب الآن..."
+    else
+        typingLabel.Text = table.concat(names, "، ") .. " يكتبون الآن..."
+    end
+end
+
+local isTypingSent = false
+local typingStopTask = nil
+local function sendTypingState(isTyping)
+    task.spawn(function()
+        pcall(function()
+            if socket and isConnected then
+                socket:Send(HttpService:JSONEncode({
+                    type = "typing",
+                    username = LocalPlayer.Name,
+                    typing = isTyping,
+                }))
+            end
+        end)
+    end)
+end
+
+local sendFrame = Instance.new("Frame")
+sendFrame.Size = UDim2.new(0, 300, 0, 50)
+sendFrame.Position = UDim2.new(0.5, -150, 0.5, -25)
+sendFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+sendFrame.Visible = false
+Instance.new("UICorner", sendFrame).CornerRadius = UDim.new(0, 8)
+sendFrame.Parent = sgui
+
+local msgInput = Instance.new("TextBox")
+msgInput.Size = UDim2.new(1, -20, 1, -10)
+msgInput.Position = UDim2.new(0, 10, 0, 5)
+msgInput.BackgroundTransparency = 1
+msgInput.TextColor3 = Color3.new(1, 1, 1)
+msgInput.PlaceholderText = "اكتب هنا واضغط Enter..."
+msgInput.Text = ""
+msgInput.ClearTextOnFocus = false
+msgInput.Font = Enum.Font.Gotham
+msgInput.TextSize = 14
+msgInput.Parent = sendFrame
+
+msgInput:GetPropertyChangedSignal("Text"):Connect(function()
+    if msgInput.Text ~= "" then
+        if not isTypingSent then
+            isTypingSent = true
+            sendTypingState(true)
+        end
+        if typingStopTask then task.cancel(typingStopTask) end
+        typingStopTask = task.delay(3, function()
+            isTypingSent = false
+            sendTypingState(false)
+        end)
+    else
+        if isTypingSent then
+            isTypingSent = false
+            sendTypingState(false)
+        end
+        if typingStopTask then
+            task.cancel(typingStopTask)
+            typingStopTask = nil
+        end
+    end
+end)
+
+local messagesContainer = Instance.new("Frame")
+messagesContainer.Size = UDim2.new(0, 300, 0, 200)
+messagesContainer.Position = UDim2.new(0.5, -150, 0, 70)
+messagesContainer.BackgroundTransparency = 1
+messagesContainer.Parent = sgui
+
+local containerScale = Instance.new("UIScale")
+containerScale.Scale = 1
+containerScale.Parent = messagesContainer
+
+local activeMessages = {}
+local lastMessageTime = 0
+local processedIds = {}
+local messageFramesById = {}
+
+local notifySound = Instance.new("Sound")
+notifySound.SoundId = "rbxassetid://6861693913"
+notifySound.Volume = 0.6
+notifySound.Parent = SoundService or workspace
+local function playNotifySound()
+    pcall(function() notifySound:Play() end)
+end
+
+local function updateSeenLabel(entry)
+    local total = #entry.seenOrder
+    if total == 0 then
+        entry.seenLabel.Text = ""
+        return
+    end
+    local displayNames = {}
+    for i = 1, math.min(3, total) do
+        local uname = entry.seenOrder[i]
+        table.insert(displayNames, userAliases[uname] or uname)
+    end
+    local text = "شاهدها: " .. table.concat(displayNames, "، ")
+    if total > 3 then text = text .. " وآخرون" end
+    entry.seenLabel.Text = text
+end
+
+local function createMessageFrame(username, text, id)
+    local frame = Instance.new("Frame")
+    local isOwnerMsg = username == OWNER_USERNAME
+    frame.Size = UDim2.new(1, 0, 0, isOwnerMsg and 80 or 64)
+    frame.BackgroundColor3 = Color3.fromRGB(45, 60, 100)
+    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
+
+    local nameLabelY = 2
+    if isOwnerMsg then
+        local ownerBadge = Instance.new("TextLabel")
+        ownerBadge.Size = UDim2.new(1, -10, 0, 16)
+        ownerBadge.Position = UDim2.new(0, 5, 0, 2)
+        ownerBadge.BackgroundTransparency = 1
+        ownerBadge.Font = Enum.Font.GothamBlack
+        ownerBadge.TextSize = 14
+        ownerBadge.TextXAlignment = Enum.TextXAlignment.Left
+        ownerBadge.Text = "MAALEK"
+        ownerBadge.TextColor3 = Color3.new(1, 1, 1)
+        ownerBadge.Parent = frame
+
+        local ownerGradient = Instance.new("UIGradient")
+        ownerGradient.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(180, 0, 0)),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(20, 20, 20)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(180, 0, 0)),
+        })
+        ownerGradient.Parent = ownerBadge
+
+        local ownerStroke = Instance.new("UIStroke")
+        ownerStroke.Thickness = 1.2
+        ownerStroke.Color = Color3.new(0, 0, 0)
+        ownerStroke.Parent = ownerBadge
+
+        nameLabelY = 18
+    end
+
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Size = UDim2.new(1, -10, 0, 20)
+    nameLabel.Position = UDim2.new(0, 5, 0, nameLabelY)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    nameLabel.Text = "[" .. (userAliases[username] or username) .. "]"
+    nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+    nameLabel.Font = Enum.Font.GothamBold
+    nameLabel.TextSize = 12
+    nameLabel.Parent = frame
+
+    local textLabel = Instance.new("TextLabel")
+    textLabel.Size = UDim2.new(1, -10, 0, 25)
+    textLabel.Position = UDim2.new(0, 5, 0, nameLabelY + 20)
+    textLabel.BackgroundTransparency = 1
+    textLabel.TextColor3 = Color3.new(1, 1, 1)
+    textLabel.Text = text
+    textLabel.TextWrapped = true
+    textLabel.TextXAlignment = Enum.TextXAlignment.Left
+    textLabel.Font = Enum.Font.Gotham
+    textLabel.TextSize = 14
+    textLabel.Parent = frame
+
+    if username == LocalPlayer.Name then
+        local seenLabel = Instance.new("TextLabel")
+        seenLabel.Size = UDim2.new(1, -10, 0, 12)
+        seenLabel.Position = UDim2.new(0, 5, 1, -13)
+        seenLabel.BackgroundTransparency = 1
+        seenLabel.TextColor3 = Color3.fromRGB(160, 160, 160)
+        seenLabel.Font = Enum.Font.Gotham
+        seenLabel.TextSize = 10
+        seenLabel.TextXAlignment = Enum.TextXAlignment.Left
+        seenLabel.Text = ""
+        seenLabel.Parent = frame
+
+        local entry = {
+            frame = frame,
+            seenLabel = seenLabel,
+            isOwn = true,
+            seenSet = {},
+            seenOrder = {},
+        }
+        messageFramesById[id] = entry
+        frame.Destroying:Connect(function()
+            messageFramesById[id] = nil
+        end)
+    end
+
+    frame.Parent = messagesContainer
+
+    local touchStartTime = 0
+    local isTouching = false
+    frame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch then
+            isTouching = true
+            touchStartTime = tick()
+            local startPos = input.Position
+            local cancelled = false
+            local MOVE_THRESHOLD = 12
+            local moveConn
+            moveConn = UserInputService.InputChanged:Connect(function(moveInput)
+                if moveInput.UserInputType == input.UserInputType then
+                    if (moveInput.Position - startPos).Magnitude > MOVE_THRESHOLD then
+                        cancelled = true
+                    end
+                end
+            end)
+            task.delay(0.6, function()
+                if moveConn then moveConn:Disconnect() end
+                if isTouching and not cancelled and (tick() - touchStartTime) >= 0.5 then
+                    local blur = Instance.new("BlurEffect")
+                    blur.Size = 15
+                    blur.Name = "ChatBlur"
+                    blur.Parent = Lighting
+                    local shadow = Instance.new("UIStroke")
+                    shadow.Thickness = 3
+                    shadow.Color = Color3.new(0, 0, 0)
+                    shadow.Transparency = 0.5
+                    shadow.Parent = frame
+                    frame.ZIndex = 10
+                    local renameGui = Instance.new("ScreenGui", sgui)
+                    local rFrame = Instance.new("Frame", renameGui)
+                    rFrame.Size = UDim2.new(0, 250, 0, 80)
+                    rFrame.Position = UDim2.new(0.5, -125, 0.5, -40)
+                    rFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+                    Instance.new("UICorner", rFrame).CornerRadius = UDim.new(0, 8)
+                    local rInput = Instance.new("TextBox", rFrame)
+                    rInput.Size = UDim2.new(1, -20, 0, 40)
+                    rInput.Position = UDim2.new(0, 10, 0, 20)
+                    rInput.PlaceholderText = "اكتب الاسم الجديد واضغط Enter"
+                    rInput.Text = ""
+                    rInput.TextColor3 = Color3.new(1, 1, 1)
+                    rInput.BackgroundTransparency = 0.8
+                    rInput.FocusLost:Connect(function(enterPressed)
+                        if enterPressed and rInput.Text ~= "" then
+                            userAliases[username] = rInput.Text
+                            saveAliases()
+                            nameLabel.Text = "[" .. rInput.Text .. "]"
+                        end
+                        blur:Destroy()
+                        shadow:Destroy()
+                        frame.ZIndex = 1
+                        renameGui:Destroy()
+                    end)
+                    rInput:CaptureFocus()
+                end
+            end)
+        end
+    end)
+    frame.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch then
+            isTouching = false
+        end
+    end)
+
+    return frame
+end
+
+local function displayNewMessage(username, text, id, silent)
+    if processedIds[id] then return end
+    processedIds[id] = true
+
+    if username ~= LocalPlayer.Name and not silent then
+        playNotifySound()
+        if not (sendFrame.Visible and msgInput.Text ~= "") then
+            showUnread()
+        end
+        task.spawn(function()
+            pcall(function()
+                if socket and isConnected then
+                    socket:Send(HttpService:JSONEncode({
+                        type = "seen",
+                        messageId = id,
+                        username = LocalPlayer.Name,
+                    }))
+                end
+            end)
+        end)
+    end
+
+    local newFrame = createMessageFrame(username, text, id)
+    local tweenInfo = TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+
+    if #activeMessages == 2 then
+        local bottomMsg = activeMessages[2]
+        TweenService:Create(bottomMsg, tweenInfo, {
+            Position = UDim2.new(0, 0, 0, 164),
+            BackgroundTransparency = 1,
+        }):Play()
+        for _, child in ipairs(bottomMsg:GetChildren()) do
+            if child:IsA("TextLabel") then
+                TweenService:Create(child, tweenInfo, { TextTransparency = 1 }):Play()
+            end
+        end
+        task.delay(0.4, function() bottomMsg:Destroy() end)
+
+        local topMsg = activeMessages[1]
+        TweenService:Create(topMsg, tweenInfo, { Position = UDim2.new(0, 0, 0, 84) }):Play()
+
+        newFrame.Position = UDim2.new(0, 0, 0, -84)
+        TweenService:Create(newFrame, tweenInfo, { Position = UDim2.new(0, 0, 0, 0) }):Play()
+
+        activeMessages[2] = activeMessages[1]
+        activeMessages[1] = newFrame
+    elseif #activeMessages == 1 then
+        local topMsg = activeMessages[1]
+        TweenService:Create(topMsg, tweenInfo, { Position = UDim2.new(0, 0, 0, 84) }):Play()
+        newFrame.Position = UDim2.new(0, 0, 0, -84)
+        TweenService:Create(newFrame, tweenInfo, { Position = UDim2.new(0, 0, 0, 0) }):Play()
+        activeMessages[2] = activeMessages[1]
+        activeMessages[1] = newFrame
+    else
+        newFrame.Position = UDim2.new(0, 0, 0, -84)
+        TweenService:Create(newFrame, tweenInfo, { Position = UDim2.new(0, 0, 0, 0) }):Play()
+        activeMessages[1] = newFrame
+    end
+end
+
+local function sendMessageToCloudflare(text)
+    if tick() - lastMessageTime < 0.25 then return end
+    lastMessageTime = tick()
+    task.spawn(function()
+        local encodeOk, payload = pcall(function()
+            return HttpService:JSONEncode({
+                type = "message",
+                username = LocalPlayer.Name,
+                message = text,
+            })
+        end)
+        if not encodeOk then
+            warn("[Chat] فشل تجهيز الرسالة:", payload)
+            return
+        end
+        if not (socket and isConnected) then
+            warn("[Chat] مفيش اتصال حاليًا، الرسالة اتلغت")
+            return
+        end
+        local ok, err = pcall(function() socket:Send(payload) end)
+        if not ok then
+            warn("[Chat] فشل إرسال الرسالة:", err)
+        end
+    end)
+end
+
+writeBtn.MouseButton1Click:Connect(function()
+    sendFrame.Visible = not sendFrame.Visible
+    if sendFrame.Visible then
+        msgInput:CaptureFocus()
+        clearUnread()
+    end
+end)
+
+msgInput.FocusLost:Connect(function(enterPressed)
+    if enterPressed and msgInput.Text ~= "" then
+        sendMessageToCloudflare(msgInput.Text)
+    end
+    msgInput.Text = ""
+    sendFrame.Visible = false
+    if isTypingSent then
+        isTypingSent = false
+        sendTypingState(false)
+    end
+    if typingStopTask then
+        task.cancel(typingStopTask)
+        typingStopTask = nil
+    end
+end)
+
+local isMinimized = false
+local normalPos = messagesContainer.Position
+local minimizedPos = UDim2.new(1, -95, 0, 60)
+local normalScale = 1
+local minimizedScale = 0.4
+
+toggleSizeBtn.MouseButton1Click:Connect(function()
+    isMinimized = not isMinimized
+    local targetScale = isMinimized and minimizedScale or normalScale
+    local targetPos = isMinimized and minimizedPos or normalPos
+    TweenService:Create(containerScale, TweenInfo.new(0.3), { Scale = targetScale }):Play()
+    TweenService:Create(messagesContainer, TweenInfo.new(0.3), { Position = targetPos }):Play()
+    toggleSizeBtn.Text = isMinimized and "+" or "-"
+end)
+
+local function sendAuthIfPossible()
+    if not OWNER_TOKEN then return end
+    pcall(function()
+        socket:Send(HttpService:JSONEncode({
+            type = "auth",
+            token = OWNER_TOKEN,
+        }))
+    end)
+end
+
+local function registerUsername()
+    pcall(function()
+        socket:Send(HttpService:JSONEncode({
+            type = "hello",
+            username = LocalPlayer.Name,
+        }))
+    end)
+end
+
+local function tryConnect()
+    local ok, ws = pcall(function()
+        return WebSocket.connect(WEBHOOK_URL)
+    end)
+    if not ok or not ws then
+        warn(("[Chat] فشل الاتصال، إعادة المحاولة بعد %d ثانية"):format(reconnectDelay))
+        isConnected = false
+        task.delay(reconnectDelay, tryConnect)
+        reconnectDelay = math.min(reconnectDelay * 2, RECONNECT_MAX)
+        return
+    end
+
+    socket = ws
+    isConnected = true
+    reconnectDelay = 2
+    print("[Chat] تم الاتصال بنجاح")
+
+    sendAuthIfPossible()
+    registerUsername()
+
+    socket.OnMessage:Connect(function(message)
+        local ok2, msg = pcall(function() return HttpService:JSONDecode(message) end)
+        if not ok2 or type(msg) ~= "table" then return end
+
+        if msg.error == "kicked" then
+            if msg.target and msg.target:lower() == LocalPlayer.Name:lower() then
+                isBannedFromChat = true
+                pcall(function() socket:Close() end)
+                task.wait(0.1)
+                local reason = (msg.reason and msg.reason ~= "" and msg.reason) or "لقد قمت بطرد نفسي بنفسي."
+                LocalPlayer:Kick(reason)
+            end
+            return
+        elseif msg.error == "banned" then
+            isBannedFromChat = true
+            pcall(function() socket:Close() end)
+            task.wait(0.1)
+            LocalPlayer:Kick("أنت محظور من الشات.")
+            return
+        elseif msg.error == "not_allowed" then
+            warn("[Chat] مش مسموحلك تستخدم الأمر ده.")
+            return
+        elseif msg.error == "links_not_allowed" then
+            warn("[Chat] ممنوع إرسال روابط.")
+            return
+        elseif msg.error == "rate_limited" then
+            warn("[Chat] عامل spam كتير، استنى شوية.")
+            return
+        elseif msg.error == "no_username" then
+            warn("[Chat] لم يتم تسجيل اسمك.")
+            return
+        end
+
+        if msg.type == "ping" then
+            pcall(function()
+                if socket and isConnected then
+                    socket:Send(HttpService:JSONEncode({ type = "pong", t = msg.t }))
+                end
+            end)
+            return
+        end
+
+        if msg.type == "auth_ok" then
+            hasAuthed = true
+            print("[Chat] تم التحقق كمالك - كل الأوامر متاحة")
+            return
+        elseif msg.type == "auth_fail" then
+            hasAuthed = false
+            warn("[Chat] توكن المالك غير صحيح - هتشتغل كلاعب عادي")
+            return
+        end
+
+        if msg.type == "system" then
+            warn("[Chat] " .. tostring(msg.message or ""))
+            return
+        end
+
+        if msg.type == "history" then
+            if type(msg.messages) == "table" then
+                for _, m in ipairs(msg.messages) do
+                    if m.id and m.username and m.message then
+                        displayNewMessage(m.username, m.message, m.id, true)
+                    end
+                end
+            end
+            return
+        end
+
+        if msg.type == "typing" then
+            if msg.username and msg.username ~= LocalPlayer.Name then
+                if msg.typing then
+                    typingUsers[msg.username] = true
+                else
+                    typingUsers[msg.username] = nil
+                end
+                updateTypingLabelText()
+            end
+            return
+        end
+
+        if msg.type == "seen" then
+            if msg.messageId and msg.username and msg.username ~= LocalPlayer.Name then
+                local entry = messageFramesById[msg.messageId]
+                if entry and entry.isOwn and not entry.seenSet[msg.username] then
+                    entry.seenSet[msg.username] = true
+                    table.insert(entry.seenOrder, msg.username)
+                    updateSeenLabel(entry)
+                end
+            end
+            return
+        end
+
+        if msg.type == "message" or (msg.id and msg.username and msg.message) then
+            displayNewMessage(msg.username, msg.message, msg.id, false)
+        end
+    end)
+
+    socket.OnClose:Connect(function()
+        isConnected = false
+        socket = nil
+        if isBannedFromChat then return end
+        warn(("[Chat] انقطع الاتصال، إعادة المحاولة بعد %d ثانية"):format(reconnectDelay))
+        task.delay(reconnectDelay, tryConnect)
+        reconnectDelay = math.min(reconnectDelay * 2, RECONNECT_MAX)
+    end)
+end
+
+tryConnect()
