@@ -1,97 +1,95 @@
-local plrs = game:GetService("Players")
-local vim = game:GetService("VirtualInputManager")
-local guiSvc = game:GetService("GuiService")
-local uis = game:GetService("UserInputService")
-local lp = plrs.LocalPlayer
-local pg = lp:WaitForChild("PlayerGui")
+local plrs = game:GetService("Players") 
+local vim = game:GetService("VirtualInputManager") 
+local guiSvc = game:GetService("GuiService") 
+local uis = game:GetService("UserInputService") 
+local lp = plrs.LocalPlayer 
+local pg = lp:WaitForChild("PlayerGui") 
 
-local gui = Instance.new("ScreenGui", pg)
-gui.Name = "FastUI"
-gui.ResetOnSpawn = false
-gui.IgnoreGuiInset = true
+local gui = Instance.new("ScreenGui", pg) 
+gui.Name = "FastUI" 
+gui.ResetOnSpawn = false 
+gui.IgnoreGuiInset = true 
 
-local btn = Instance.new("TextButton", gui)
-btn.Size = UDim2.new(0, 55, 0, 55)
-btn.Position = UDim2.new(0.1, 0, 0.4, 0)
-btn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-btn.Text = "7S"
-btn.TextColor3 = Color3.fromRGB(160, 160, 160)
-btn.TextSize = 16
-btn.Font = Enum.Font.SourceSansBold
-btn.Active = true
-btn.Draggable = false
+local btn = Instance.new("TextButton", gui) 
+btn.Size = UDim2.new(0, 55, 0, 55) 
+btn.Position = UDim2.new(0.1, 0, 0.4, 0) 
+btn.BackgroundColor3 = Color3.fromRGB(15, 15, 15) 
+btn.Text = "7S" 
+btn.TextColor3 = Color3.fromRGB(160, 160, 160) 
+btn.TextSize = 16 
+btn.Font = Enum.Font.SourceSansBold 
+btn.Active = true 
+btn.Draggable = false 
 
-local c = Instance.new("UICorner", btn)
-c.CornerRadius = UDim.new(1, 0)
+local c = Instance.new("UICorner", btn) 
+c.CornerRadius = UDim.new(1, 0) 
+local s = Instance.new("UIStroke", btn) 
+s.Color = Color3.fromRGB(60, 60, 60) 
+s.Thickness = 2 
 
-local s = Instance.new("UIStroke", btn)
-s.Color = Color3.fromRGB(60, 60, 60)
-s.Thickness = 2
+local dragging, dInput, dStart, sPos, moved = false, nil, nil, nil, false 
 
-local dragging, dInput, dStart, sPos, moved = false, nil, nil, nil, false
+btn.InputBegan:Connect(function(io) 
+    if not moved and (io.UserInputType == Enum.UserInputType.MouseButton1 or io.UserInputType == Enum.UserInputType.Touch) then 
+        dragging = true 
+        dStart = io.Position 
+        sPos = btn.Position 
+        io.Changed:Connect(function() 
+            if io.UserInputState == Enum.UserInputState.End and dragging then 
+                dragging = false 
+                moved = true 
+            end 
+        end) 
+    end 
+end) 
 
-btn.InputBegan:Connect(function(io)
-    if not moved and (io.UserInputType == Enum.UserInputType.MouseButton1 or io.UserInputType == Enum.UserInputType.Touch) then
-        dragging = true
-        dStart = io.Position
-        sPos = btn.Position
-        io.Changed:Connect(function()
-            if io.UserInputState == Enum.UserInputState.End and dragging then
-                dragging = false
-                moved = true
-            end
-        end)
-    end
-end)
+btn.InputChanged:Connect(function(io) 
+    if not moved and (io.UserInputType == Enum.UserInputType.MouseMovement or io.UserInputType == Enum.UserInputType.Touch) then 
+        dInput = io 
+    end 
+end) 
 
-btn.InputChanged:Connect(function(io)
-    if not moved and (io.UserInputType == Enum.UserInputType.MouseMovement or io.UserInputType == Enum.UserInputType.Touch) then
-        dInput = io
-    end
-end)
+uis.InputChanged:Connect(function(io) 
+    if not moved and dragging and io == dInput then 
+        local delta = io.Position - dStart 
+        btn.Position = UDim2.new(sPos.X.Scale, sPos.X.Offset + delta.X, sPos.Y.Scale, sPos.Y.Offset + delta.Y) 
+    end 
+end) 
 
-uis.InputChanged:Connect(function(io)
-    if not moved and dragging and io == dInput then
-        local delta = io.Position - dStart
-        btn.Position = UDim2.new(sPos.X.Scale, sPos.X.Offset + delta.X, sPos.Y.Scale, sPos.Y.Offset + delta.Y)
-    end
-end)
+local function click(el) 
+    if el and el.Visible then 
+        local pos, sz = el.AbsolutePosition, el.AbsoluteSize 
+        local tx, ty = pos.X + (sz.X / 2), pos.Y + (sz.Y / 2) 
+        local inset = guiSvc:GetGuiInset() 
+        vim:SendTouchEvent(999, 0, tx + inset.X, ty + inset.Y) 
+        vim:SendTouchEvent(999, 2, tx + inset.X, ty + inset.Y) 
+    end 
+end 
 
-local function click(el)
-    if el and el.Visible then
-        local pos, sz = el.AbsolutePosition, el.AbsoluteSize
-        local tx, ty = pos.X + (sz.X / 2), pos.Y + (sz.Y / 2)
-        local inset = guiSvc:GetGuiInset()
-        vim:SendTouchEvent(999, 0, tx + inset.X, ty + inset.Y)
-        task.wait(0.01)
-        vim:SendTouchEvent(999, 2, tx + inset.X, ty + inset.Y)
-    end
-end
+local function run() 
+    local menuBtn = pg:FindFirstChild("MenuGui") and pg.MenuGui:FindFirstChild("TopRight") and pg.MenuGui.TopRight:FindFirstChild("ToysOpenCloseButton") 
+    if menuBtn then 
+        click(menuBtn) 
+        local target = pg:FindFirstChild("MenuGui") and pg.MenuGui:FindFirstChild("Menu") and pg.MenuGui.Menu:FindFirstChild("TabContents") and pg.MenuGui.Menu.TabContents:FindFirstChild("Toys") and pg.MenuGui.Menu.TabContents.Toys:FindFirstChild("Contents") and pg.MenuGui.Menu.TabContents.Toys.Contents:FindFirstChild("PalletLightBrown") 
+        if target then 
+            click(target) 
+        end 
+        click(menuBtn) 
+    end 
+end 
 
-local function run()
-    local menuBtn = pg:FindFirstChild("MenuGui") and pg.MenuGui:FindFirstChild("TopRight") and pg.MenuGui.TopRight:FindFirstChild("ToysOpenCloseButton")
-    if menuBtn then
-        click(menuBtn)
-        task.wait(0.03)
-        local target = pg:FindFirstChild("MenuGui") and pg.MenuGui:FindFirstChild("Menu") and pg.MenuGui.Menu:FindFirstChild("TabContents") and pg.MenuGui.Menu.TabContents:FindFirstChild("Toys") and pg.MenuGui.Menu.TabContents.Toys:FindFirstChild("Contents") and pg.MenuGui.Menu.TabContents.Toys.Contents:FindFirstChild("PalletLightBrown")
-        if target then
-            click(target)
-        end
-        task.wait(0.03)
-        click(menuBtn)
-    end
-end
+btn.MouseButton1Down:Connect(function() 
+    if not dragging then 
+        btn.BackgroundColor3 = Color3.fromRGB(35, 35, 35) 
+    end 
+end) 
 
-btn.MouseButton1Down:Connect(function()
-    if not dragging then btn.BackgroundColor3 = Color3.fromRGB(35, 35, 35) end
-end)
+btn.MouseButton1Up:Connect(function() 
+    btn.BackgroundColor3 = Color3.fromRGB(15, 15, 15) 
+end) 
 
-btn.MouseButton1Up:Connect(function()
-    btn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-end)
-
-btn.MouseButton1Click:Connect(function()
-    if not dragging then
-        pcall(run)
-    end
+btn.MouseButton1Click:Connect(function() 
+    if not dragging then 
+        pcall(run) 
+    end 
 end)
