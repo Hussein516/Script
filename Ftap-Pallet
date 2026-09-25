@@ -70,7 +70,17 @@ local function run()
     local menuBtn = pg:FindFirstChild("MenuGui") and pg.MenuGui:FindFirstChild("TopRight") and pg.MenuGui.TopRight:FindFirstChild("ToysOpenCloseButton") 
     if menuBtn then 
         click(menuBtn) 
-        local target = pg:FindFirstChild("MenuGui") and pg.MenuGui:FindFirstChild("Menu") and pg.MenuGui.Menu:FindFirstChild("TabContents") and pg.MenuGui.Menu.TabContents:FindFirstChild("Toys") and pg.MenuGui.Menu.TabContents.Toys:FindFirstChild("Contents") and pg.MenuGui.Menu.TabContents.Toys.Contents:FindFirstChild("PalletLightBrown") 
+        
+        -- التحقق من ظهور الزر الثاني فوراً وبأقصى سرعة ممكنة بدون تأخير زمني ثابت
+        local target = nil
+        local startTime = tick()
+        repeat
+            target = pg:FindFirstChild("MenuGui") and pg.MenuGui:FindFirstChild("Menu") and pg.MenuGui.Menu:FindFirstChild("TabContents") and pg.MenuGui.Menu.TabContents:FindFirstChild("Toys") and pg.MenuGui.Menu.TabContents.Toys:FindFirstChild("Contents") and pg.MenuGui.Menu.TabContents.Toys.Contents:FindFirstChild("PalletLightBrown")
+            if not target or not target.Visible then
+                task.wait()
+            end
+        until (target and target.Visible) or (tick() - startTime > 0.5)
+
         if target then 
             click(target) 
         end 
