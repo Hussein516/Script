@@ -70,8 +70,7 @@ local function run()
     local menuBtn = pg:FindFirstChild("MenuGui") and pg.MenuGui:FindFirstChild("TopRight") and pg.MenuGui.TopRight:FindFirstChild("ToysOpenCloseButton") 
     if menuBtn then 
         click(menuBtn) 
-        
-        -- التحقق من ظهور الزر الثاني فوراً وبأقصى سرعة ممكنة بدون تأخير زمني ثابت
+                
         local target = nil
         local startTime = tick()
         repeat
