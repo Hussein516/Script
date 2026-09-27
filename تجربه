@@ -1,0 +1,82 @@
+local plrs = game:GetService("Players")
+local lp = plrs.LocalPlayer
+local pg = lp:WaitForChild("PlayerGui")
+
+local gui = Instance.new("ScreenGui", pg)
+gui.Name = "FastUI_MenuFix"
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+
+local btn = Instance.new("TextButton", gui)
+btn.Size = UDim2.new(0, 55, 0, 55)
+btn.Position = UDim2.new(0.1, 0, 0.4, 0)
+btn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+btn.Text = "7S"
+btn.TextColor3 = Color3.fromRGB(160, 160, 160)
+btn.TextSize = 16
+btn.Font = Enum.Font.SourceSansBold
+btn.Active = true
+btn.Draggable = true
+
+local c = Instance.new("UICorner", btn)
+c.CornerRadius = UDim.new(1, 0)
+local s = Instance.new("UIStroke", btn)
+s.Color = Color3.fromRGB(60, 60, 60)
+s.Thickness = 2
+
+local function clickElement(element)
+    if element then
+        pcall(function()
+            for _, conn in pairs(getconnections(element.Activated)) do
+                conn:Fire()
+            end
+        end)
+        pcall(function()
+            for _, conn in pairs(getconnections(element.MouseButton1Click)) do
+                conn:Fire()
+            end
+        end)
+    end
+end
+
+local function run()
+    print("سيدي: جاري فتح القائمة والبحث عن العناصر...")
+    
+    -- 1. العثور على زر القائمة الرئيسي وضغطه
+    local menuBtn = pg:FindFirstChild("MenuGui") 
+        and pg.MenuGui:FindFirstChild("TopRight") 
+        and pg.MenuGui.TopRight:FindFirstChild("ToysOpenCloseButton")
+    
+    if menuBtn then
+        clickElement(menuBtn)
+        print("سيدي: تم النقر على زر القائمة، بانتظار تحميل الخشبة (Pallet)...")
+        
+        -- 2. الانتظار حتى تظهر الخشبة (PalletLightBrown) مع مهلة زمنية كافية لتحميلها
+        local target = nil
+        local startTime = tick()
+        
+        repeat
+            task.wait(0.1)
+            pcall(function()
+                target = pg.MenuGui.Menu.TabContents.Toys.Contents:FindFirstChild("PalletLightBrown")
+            end)
+        until (target and target.Parent) or (tick() - startTime > 3) -- مهلة 3 ثواني كافية لظهورها
+        
+        if target then
+            print("سيدي: تم العثور على الخشبة بنجاح، جاري النقر عليها...")
+            clickElement(target)
+        else
+            print("سيدي: انتهت المهلة ولم تظهر الخشبة، ربما المسار غير دقيق أو تحتاج وقتاً أطول.")
+        end
+        
+        -- إغلاق القائمة بعد الانتهاء إذا لزم الأمر
+        task.wait(0.2)
+        clickElement(menuBtn)
+    else
+        print("سيدي: لم يتم العثور على زر فتح القائمة الأساسي.")
+    end
+end
+
+btn.MouseButton1Click:Connect(function()
+    pcall(run)
+end)
