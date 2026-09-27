@@ -2,10 +2,9 @@ local plrs = game:GetService("Players")
 local vim = game:GetService("VirtualInputManager")
 local guiSvc = game:GetService("GuiService")
 local lp = plrs.LocalPlayer
-local pg = lp:WaitForChild("PlayerGui")
 
-local gui = Instance.new("ScreenGui", pg)
-gui.Name = "FastUI_DirectClick"
+local gui = Instance.new("ScreenGui", lp:WaitForChild("PlayerGui"))
+gui.Name = "FastUI_ExactPath"
 gui.ResetOnSpawn = false
 gui.IgnoreGuiInset = true
 
@@ -26,7 +25,6 @@ local s = Instance.new("UIStroke", btn)
 s.Color = Color3.fromRGB(60, 60, 60)
 s.Thickness = 2
 
--- دالة ضغط موحدة وسريعة مثل زر الـ Menu تماماً
 local function clickIt(obj)
     if not obj then return end
     pcall(function()
@@ -45,28 +43,27 @@ local function clickIt(obj)
 end
 
 local function run()
-    local menuGui = pg:FindFirstChild("MenuGui")
-    if not menuGui then return end
+    -- 1. العثور على زر الـ Menu بالطريقة العادية وضغطه لفتح القائمة
+    local pg = lp:FindFirstChild("PlayerGui")
+    local menuBtn = pg and pg:FindFirstChild("MenuGui") and pg.MenuGui:FindFirstChild("TopRight") and pg.MenuGui.TopRight:FindFirstChild("ToysOpenCloseButton")
     
-    local menuBtn = menuGui:FindFirstChild("TopRight") and menuGui.TopRight:FindFirstChild("ToysOpenCloseButton")
     if menuBtn then
-        -- 1. اضغط على الـ Menu مثل العادة
         clickIt(menuBtn)
         
-        -- 2. انتظر ظهور الخشبة ثم اضغط عليها بنفس الطريقة فوراً
+        -- 2. الانتظار واستخدام المسار الجديد الذي طلبتَه تماماً للخشبة
         local target = nil
         local startTime = tick()
         
         repeat
             task.wait(0.05)
             pcall(function()
-                target = menuGui.Menu.TabContents.Toys.Contents:FindFirstChild("PalletLightBrown")
+                target = game:GetService("Players").LocalPlayer.IsHeld.MenuGui.Menu.TabContents.Toys.Contents.PalletLightBrown
             end)
         until (target and target.AbsoluteSize.X > 0) or (tick() - startTime > 1.5)
         
         if target then
-            task.wait(0.05) -- استقرار بسيط لمكان الخشبة على الشاشة
-            clickIt(target)  -- اضغط عليها تماماً مثل الـ Menu
+            task.wait(0.05)
+            clickIt(target) -- الضغط على الخشبة بالمسار الجديد مثل الـ Menu تماماً
         end
     end
 end
