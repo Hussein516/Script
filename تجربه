@@ -3,7 +3,7 @@ local lp = plrs.LocalPlayer
 local pg = lp:WaitForChild("PlayerGui")
 
 local gui = Instance.new("ScreenGui", pg)
-gui.Name = "FastUI_MenuFix"
+gui.Name = "FastUI_ToggleFix"
 gui.ResetOnSpawn = false
 gui.IgnoreGuiInset = true
 
@@ -24,56 +24,75 @@ local s = Instance.new("UIStroke", btn)
 s.Color = Color3.fromRGB(60, 60, 60)
 s.Thickness = 2
 
-local function clickElement(element)
-    if element then
-        pcall(function()
-            for _, conn in pairs(getconnections(element.Activated)) do
-                conn:Fire()
-            end
-        end)
-        pcall(function()
-            for _, conn in pairs(getconnections(element.MouseButton1Click)) do
-                conn:Fire()
-            end
-        end)
-    end
+local function fireClick(element)
+    if not element then return end
+    pcall(function()
+        for _, conn in pairs(getconnections(element.Activated)) do
+            conn:Fire()
+        end
+    end)
+    pcall(function()
+        for _, conn in pairs(getconnections(element.MouseButton1Click)) do
+            conn:Fire()
+        end
+    end)
 end
 
 local function run()
-    print("سيدي: جاري فتح القائمة والبحث عن العناصر...")
+    print("سيدي: بدء العملية...")
     
-    -- 1. العثور على زر القائمة الرئيسي وضغطه
-    local menuBtn = pg:FindFirstChild("MenuGui") 
-        and pg.MenuGui:FindFirstChild("TopRight") 
-        and pg.MenuGui.TopRight:FindFirstChild("ToysOpenCloseButton")
+    -- خطوة 1: العثور على زر فتح القائمة
+    local menuGui = pg:FindFirstChild("MenuGui")
+    if not menuGui then
+        print("سيدي: خطأ - لم يتم العثور على MenuGui الأساسي!")
+        return
+    end
     
-    if menuBtn then
-        clickElement(menuBtn)
-        print("سيدي: تم النقر على زر القائمة، بانتظار تحميل الخشبة (Pallet)...")
-        
-        -- 2. الانتظار حتى تظهر الخشبة (PalletLightBrown) مع مهلة زمنية كافية لتحميلها
-        local target = nil
-        local startTime = tick()
-        
-        repeat
-            task.wait(0.1)
-            pcall(function()
-                target = pg.MenuGui.Menu.TabContents.Toys.Contents:FindFirstChild("PalletLightBrown")
-            end)
-        until (target and target.Parent) or (tick() - startTime > 3) -- مهلة 3 ثواني كافية لظهورها
-        
-        if target then
-            print("سيدي: تم العثور على الخشبة بنجاح، جاري النقر عليها...")
-            clickElement(target)
-        else
-            print("سيدي: انتهت المهلة ولم تظهر الخشبة، ربما المسار غير دقيق أو تحتاج وقتاً أطول.")
-        end
-        
-        -- إغلاق القائمة بعد الانتهاء إذا لزم الأمر
-        task.wait(0.2)
-        clickElement(menuBtn)
+    local topRight = menuGui:FindFirstChild("TopRight")
+    if not topRight then
+        print("سيدي: خطأ - لم يتم العثور على TopRight!")
+        return
+    end
+    
+    local menuBtn = topRight:FindFirstChild("ToysOpenCloseButton")
+    if not menuBtn then
+        print("سيدي: خطأ - لم يتم العثور على ToysOpenCloseButton!")
+        return
+    end
+    
+    -- النقر لفتح القائمة
+    print("سيدي: جاري الضغط لفتح القائمة...")
+    fireClick(menuBtn)
+    
+    -- خطوة 2: الانتظار حتى تظهر الخشبة بعد فتح القائمة
+    print("سيدي: بانتظار ظهور الخشبة (PalletLightBrown)...")
+    local target = nil
+    local startTime = tick()
+    
+    repeat
+        task.wait(0.1)
+        pcall(function()
+            local menu = menuGui:FindFirstChild("Menu")
+            if menu then
+                local tabContents = menu:FindFirstChild("TabContents")
+                if tabContents then
+                    local toys = tabContents:FindFirstChild("Toys")
+                    if toys then
+                        local contents = toys:FindFirstChild("Contents")
+                        if contents then
+                            target = contents:FindFirstChild("PalletLightBrown")
+                        end
+                    end
+                end
+            end
+        end)
+    until (target ~= nil) or (tick() - startTime > 2) -- مهلة ثانيتين كافية للظهور
+    
+    if target then
+        print("سيدي: تم العثور على الخشبة بنجاح، جاري النقر عليها!")
+        fireClick(target)
     else
-        print("سيدي: لم يتم العثور على زر فتح القائمة الأساسي.")
+        print("سيدي: انتهت المهلة، الخشبة لم تظهر داخل القائمة المفتوحة! ربما الاسم مختلف أو المسار تغير.")
     end
 end
 
