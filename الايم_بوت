@@ -1,0 +1,538 @@
+-- FTAP ULTIMATE SYSTEM (V26.0 - HIGH POWER EDITION)
+-- Target: Xiaomi Tablet / Delta Executor
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local GuiService = game:GetService("GuiService")
+local player = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+-- [1] الإعدادات الأساسية سيدي
+Camera.FieldOfView = 120
+
+_G.AimbotEnabled = true
+_G.RageMode = false 
+_G.DivineWrath = false 
+_G.AimRange = 25 
+_G.FovSize = 60  
+_G.ManualObject = nil
+
+-- ميزات الحماية والتحكم سيدي
+_G.CameraSpeedCheck = true -- تفعيل شرط سرعة تحريك الكاميرا
+_G.MinCameraVelocity = 8   -- الحد الأدنى لسرعة التمرير حتى يتدخل التوجيه
+
+_G.BlacklistOnlyMode = true -- تفعيل حصر الضغط على القائمة السوداء فقط
+local blacklistedPlayers = {} -- جدول القائمة السوداء [Username] = true
+
+_G.MaxReflexSpeed = 0.65 
+_G.ScriptWeight = 0.98   
+
+local myVictims = {} 
+local forbiddenAnimID = "rbxassetid://7047322890"
+local lastGrabTime = 0 
+local isPlayerGrabbed = false 
+
+-- متغيرات تتبع حركة الكاميرا سيدي
+local lastCameraCFrame = Camera.CFrame
+local cameraVelocity = 0
+
+-- متغيرات تتبع الجزء الحالي والإزاحة الثابتة سيدي
+local currentTargetPart = nil
+local cachedRandomOffset = Vector3.new(0, 0, 0)
+
+-- متغيرات إدارة حالة اللون والـ Cooldown سيدي
+local wasForbiddenColor = false
+colorChangeTime = 0
+local COOLDOWN_TIME = 0.01 -- تقليل وقت الانتظار لتسريع الاستجابة الفورية
+
+-- متغير Cooldown الجديد التلقائي لكل ضغطة (0.2 ثانية) سيدي
+local isActionCoolingDown = false
+
+-- [نظام التجسس الصامت سيدي]
+local mt = getrawmetatable(game)
+local oldNamecall = mt.__namecall
+setreadonly(mt, false)
+
+mt.__namecall = newcclosure(function(self, ...)
+    local args = {...}
+    local method = getnamecallmethod()
+    
+    if method == "FireServer" and tostring(self) == "CreateGrabLine" then
+        task.spawn(function()
+            local targetPart = args[1]
+            if targetPart and typeof(targetPart) == "Instance" then
+                local char = targetPart:FindFirstAncestorOfClass("Model")
+                local victim = Players:GetPlayerFromCharacter(char)
+                
+                lastGrabTime = tick()
+                isPlayerGrabbed = true 
+                if victim then
+                    myVictims[victim.Name] = true
+                end
+            end
+        end)
+    end
+    return oldNamecall(self, ...)
+end)
+setreadonly(mt, true)
+
+local function checkVictimStatus()
+    local count = 0
+    for vName, _ in pairs(myVictims) do
+        local vPlayer = Players:FindFirstChild(vName)
+        if vPlayer and vPlayer.Character then
+            local hum = vPlayer.Character:FindFirstChildOfClass("Humanoid")
+            if hum then
+                local playingTracks = hum:GetPlayingAnimationTracks()
+                local isStillGrabbed = false
+                for _, track in pairs(playingTracks) do
+                    if track.Animation and tostring(track.Animation.AnimationId) == forbiddenAnimID then
+                        isStillGrabbed = true; break
+                    end
+                end
+                if not isStillGrabbed then myVictims[vName] = nil else count = count + 1 end
+            end
+        else
+            myVictims[vName] = nil
+        end
+    end
+    if count == 0 and tick() - lastGrabTime > 0.5 then isPlayerGrabbed = false end
+    return count
+end
+
+-- [2] بناء الواجهة الرئيسية والفرعية سيدي
+local screenGui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+screenGui.Name = "FTAP_V26_0_REBORN"
+screenGui.ResetOnSpawn = false
+screenGui.IgnoreGuiInset = true 
+
+local fovCircle = Instance.new("Frame", screenGui)
+fovCircle.BackgroundTransparency = 1; fovCircle.AnchorPoint = Vector2.new(0.5, 0.5)
+fovCircle.Position = UDim2.new(0.5, 0, 0.5, 0); fovCircle.Size = UDim2.new(0, _G.FovSize * 2, 0, _G.FovSize * 2)
+local stroke = Instance.new("UIStroke", fovCircle); stroke.Color = Color3.fromRGB(255, 0, 0)
+Instance.new("UICorner", fovCircle).CornerRadius = UDim.new(1, 0)
+
+local toggleBtn = Instance.new("TextButton", screenGui)
+toggleBtn.Size = UDim2.new(0, 45, 0, 45); toggleBtn.Position = UDim2.new(0.02, 0, 0.45, 0)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30); toggleBtn.Text = "FTAP"; toggleBtn.TextColor3 = Color3.new(1, 1, 1)
+Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(1, 0)
+
+local mainFrame = Instance.new("Frame", screenGui)
+mainFrame.Size = UDim2.new(0, 210, 0, 480); mainFrame.Position = UDim2.new(0.05, 0, 0.15, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20); mainFrame.Visible = false; mainFrame.Active = true; mainFrame.Draggable = true 
+Instance.new("UICorner", mainFrame)
+
+local function createLabeledInput(labelTxt, default, pos, parent)
+    local label = Instance.new("TextLabel", parent)
+    label.Size = UDim2.new(0.4, 0, 0, 25); label.Position = UDim2.new(0.05, 0, pos.Y.Scale, 0)
+    label.Text = labelTxt; label.TextColor3 = Color3.new(0.8, 0.8, 0.8); label.BackgroundTransparency = 1; label.TextXAlignment = Enum.TextXAlignment.Left
+    local box = Instance.new("TextBox", parent)
+    box.Size = UDim2.new(0.45, 0, 0, 25); box.Position = UDim2.new(0.5, 0, pos.Y.Scale, 0)
+    box.Text = default; box.BackgroundColor3 = Color3.fromRGB(40, 40, 40); box.TextColor3 = Color3.new(1,1,1)
+    Instance.new("UICorner", box); return box
+end
+
+local function createBtn(text, pos, color, parent)
+    local btn = Instance.new("TextButton", parent or mainFrame)
+    btn.Size = UDim2.new(0.9, 0, 0, 30); btn.Position = pos
+    btn.Text = text; btn.BackgroundColor3 = color; btn.TextColor3 = Color3.new(1,1,1)
+    btn.TextSize = 11
+    Instance.new("UICorner", btn); return btn
+end
+
+local distInput = createLabeledInput("Dist:", "25", UDim2.new(0,0,0.04,0), mainFrame)
+local fovInput = createLabeledInput("FOV:", "60", UDim2.new(0,0,0.11,0), mainFrame)
+local aimToggleBtn = createBtn("AIMBOT: ON", UDim2.new(0.05, 0, 0.18, 0), Color3.fromRGB(0, 120, 0))
+local objectBtn = createBtn("SELECT OBJECT", UDim2.new(0.05, 0, 0.26, 0), Color3.fromRGB(80, 0, 150))
+local rageBtn = createBtn("RAGE MODE: OFF", UDim2.new(0.05, 0, 0.34, 0), Color3.fromRGB(45, 45, 45))
+local divineWrathBtn = createBtn("DIVINE WRATH: OFF", UDim2.new(0.05, 0, 0.42, 0), Color3.fromRGB(150, 150, 150))
+
+local camSpeedBtn = createBtn("SPEED LOCK: ON", UDim2.new(0.05, 0, 0.50, 0), Color3.fromRGB(0, 120, 120))
+local blacklistOnlyBtn = createBtn("BLACKLIST ONLY: ON", UDim2.new(0.05, 0, 0.58, 0), Color3.fromRGB(180, 100, 0))
+local addNearestBtn = createBtn("ADD NEAREST TO BLACKLIST", UDim2.new(0.05, 0, 0.66, 0), Color3.fromRGB(150, 0, 0))
+local openBlacklistGuiBtn = createBtn("OPEN BLACKLIST GUI", UDim2.new(0.05, 0, 0.74, 0), Color3.fromRGB(60, 60, 60))
+
+-- [واجهة القائمة السوداء الفرعية سيدي]
+local blacklistFrame = Instance.new("Frame", screenGui)
+blacklistFrame.Size = UDim2.new(0, 260, 0, 320); blacklistFrame.Position = UDim2.new(0.3, 0, 0.25, 0)
+blacklistFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15); blacklistFrame.Visible = false; blacklistFrame.Active = true; blacklistFrame.Draggable = true
+Instance.new("UICorner", blacklistFrame)
+
+local blTitle = Instance.new("TextLabel", blacklistFrame)
+blTitle.Size = UDim2.new(1, 0, 0, 30); blTitle.Text = "BLACKLIST MANAGEMENT"; blTitle.TextColor3 = Color3.new(1,1,1); blTitle.BackgroundTransparency = 1
+
+local addInput = Instance.new("TextBox", blacklistFrame)
+addInput.Size = UDim2.new(0.65, 0, 0, 25); addInput.Position = UDim2.new(0.05, 0, 0.1, 0)
+addInput.PlaceholderText = "Prefix / Part of Name"; addInput.BackgroundColor3 = Color3.fromRGB(35, 35, 35); addInput.TextColor3 = Color3.new(1,1,1)
+Instance.new("UICorner", addInput)
+
+local manualAddBtn = Instance.new("TextButton", blacklistFrame)
+manualAddBtn.Size = UDim2.new(0.22, 0, 0, 25); manualAddBtn.Position = UDim2.new(0.73, 0, 0.1, 0)
+manualAddBtn.Text = "ADD"; manualAddBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 0); manualAddBtn.TextColor3 = Color3.new(1,1,1)
+Instance.new("UICorner", manualAddBtn)
+
+local scrollList = Instance.new("ScrollingFrame", blacklistFrame)
+scrollList.Size = UDim2.new(0.9, 0, 0.75, 0); scrollList.Position = UDim2.new(0.05, 0, 0.2, 0)
+scrollList.BackgroundColor3 = Color3.fromRGB(25, 25, 25); scrollList.CanvasSize = UDim2.new(0, 0, 0, 0)
+local listLayout = Instance.new("UIListLayout", scrollList)
+listLayout.Padding = UDim.new(0, 5)
+
+-- دالة تحديث قائمة العرض القائمة السوداء سيدي
+local function refreshBlacklistGUI()
+    for _, child in pairs(scrollList:GetChildren()) do
+        if child:IsA("Frame") then child:Destroy() end
+    end
+    
+    local contentHeight = 0
+    for targetName, _ in pairs(blacklistedPlayers) do
+        local targetPlayer = Players:FindFirstChild(targetName)
+        local displayName = targetPlayer and targetPlayer.DisplayName or targetName
+        local userId = targetPlayer and targetPlayer.UserId or 1
+        
+        local itemFrame = Instance.new("Frame", scrollList)
+        itemFrame.Size = UDim2.new(1, 0, 0, 45)
+        itemFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        Instance.new("UICorner", itemFrame)
+        
+        local img = Instance.new("ImageLabel", itemFrame)
+        img.Size = UDim2.new(0, 35, 0, 35); img.Position = UDim2.new(0.03, 0, 0.1, 0)
+        img.Image = "rbxthumb://type=AvatarHeadShot&id=" .. userId .. "&w=150&h=150"
+        Instance.new("UICorner", img).CornerRadius = UDim.new(1, 0)
+        
+        local nameLabel = Instance.new("TextLabel", itemFrame)
+        nameLabel.Size = UDim2.new(0.5, 0, 0.8, 0); nameLabel.Position = UDim2.new(0.22, 0, 0.1, 0)
+        nameLabel.Text = displayName .. "\n(@" .. targetName .. ")"
+        nameLabel.TextColor3 = Color3.new(1,1,1); nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+        nameLabel.TextSize = 10; nameLabel.BackgroundTransparency = 1
+        
+        local delBtn = Instance.new("TextButton", itemFrame)
+        delBtn.Size = UDim2.new(0.2, 0, 0.6, 0); delBtn.Position = UDim2.new(0.76, 0, 0.2, 0)
+        delBtn.Text = "REMOVE"; delBtn.BackgroundColor3 = Color3.fromRGB(180, 0, 0); delBtn.TextColor3 = Color3.new(1,1,1)
+        delBtn.TextSize = 9
+        Instance.new("UICorner", delBtn)
+        
+        delBtn.MouseButton1Click:Connect(function()
+            blacklistedPlayers[targetName] = nil
+            refreshBlacklistGUI()
+        end)
+        
+        contentHeight = contentHeight + 50
+    end
+    scrollList.CanvasSize = UDim2.new(0, 0, 0, contentHeight)
+end
+
+-- [3] دالة فحص اللون الممنوع والـ Cooldown سيدي
+local function isCurrentColorCyan()
+    local isCyan = false
+    pcall(function()
+        local btnFrame = player.PlayerGui.ContextActionGui.ContextButtonFrame:GetChildren()[2]
+        if btnFrame then
+            local imgColor = btnFrame.ImageColor3
+            local icon = btnFrame:FindFirstChild("ActionIcon") or btnFrame:FindFirstChildOfClass("ImageLabel")
+            if icon then
+                imgColor = icon.ImageColor3
+            end
+            if imgColor and math.abs(imgColor.R - 0) < 0.05 and math.abs(imgColor.G - 1) < 0.05 and math.abs(imgColor.B - 1) < 0.05 then
+                isCyan = true
+            end
+        end
+    end)
+    return isCyan
+end
+
+local function isButtonInForbiddenColor()
+    local isCyan = isCurrentColorCyan()
+    if isCyan then
+        wasForbiddenColor = true
+    else
+        if wasForbiddenColor then
+            wasForbiddenColor = false
+            colorChangeTime = tick()
+        end
+    end
+    if isCyan or (tick() - colorChangeTime < COOLDOWN_TIME) then
+        return true
+    end
+    return false
+end
+
+-- دالة فحص خلو المسار من العوائق سيدي
+local function isTargetVisibleInOpenSpace(targetPart, myChar)
+    if not targetPart or not myChar then return false end
+    local rayOrigin = Camera.CFrame.Position
+    local rayDirection = targetPart.Position - rayOrigin
+    local rayParams = RaycastParams.new()
+    rayParams.FilterDescendantsInstances = {myChar, targetPart.Parent}
+    rayParams.FilterType = Enum.RaycastFilterType.Exclude
+    rayParams.IgnoreWater = true
+    local rayResult = workspace:Raycast(rayOrigin, rayDirection, rayParams)
+    return rayResult == nil
+end
+
+-- [4] دالة الضغط والتمسك الخاطف المباشر مع ميزة الـ 0.2 ثانية التلقائية سيدي
+local function triggerTargetElement()
+    if isActionCoolingDown then return end
+    isActionCoolingDown = true
+
+    pcall(function()
+        local ashleyBtn = player.PlayerGui.ContextActionGui.ContextButtonFrame:GetChildren()[2]
+        if ashleyBtn then
+            local absolutePosition = ashleyBtn.AbsolutePosition
+            local absoluteSize = ashleyBtn.AbsoluteSize
+            local targetX = absolutePosition.X + (absoluteSize.X / 2)
+            local targetY = absolutePosition.Y + (absoluteSize.Y / 2)
+            
+            local inset = GuiService:GetGuiInset()
+            local finalX = targetX + inset.X
+            local finalY = targetY + inset.Y
+            
+            local customTouchID = 999 
+            VirtualInputManager:SendTouchEvent(customTouchID, 0, finalX, finalY)
+            VirtualInputManager:SendTouchEvent(customTouchID, 2, finalX, finalY)
+
+            -- استنساخ ونظام الـ FakeAshley المطابق بنسبة 100% والخاص بالوقت واللون سيدي
+            task.spawn(function()
+                local connection
+                local startTime = tick()
+                
+                connection = RunService.RenderStepped:Connect(function()
+                    if tick() - startTime > 1.5 then
+                        if connection then connection:Disconnect() end
+                        return
+                    end
+                    
+                    pcall(function()
+                        local col = ashleyBtn.ImageColor3 or ashleyBtn.BackgroundColor3
+                        if col and (math.floor(col.R * 255) == 255 or math.floor(col.G * 255) == 255 or math.floor(col.B * 255) == 255) then
+                            if connection then connection:Disconnect() end
+                            
+                            local fakeAshley = ashleyBtn:Clone()
+                            for _, child in ipairs(fakeAshley:GetDescendants()) do
+                                if child:IsA("LuaSourceContainer") then
+                                    child:Destroy()
+                                end
+                            end
+                            
+                            fakeAshley.Parent = ashleyBtn.Parent
+                            fakeAshley.Size = ashleyBtn.Size
+                            fakeAshley.Position = ashleyBtn.Position
+                            fakeAshley.AnchorPoint = ashleyBtn.AnchorPoint
+                            fakeAshley.ZIndex = ashleyBtn.ZIndex - 1 
+                            fakeAshley.Active = false 
+                            
+                            ashleyBtn.Visible = false
+                            
+                            task.wait(1)
+                            
+                            if fakeAshley then
+                                fakeAshley:Destroy()
+                            end
+                            
+                            if ashleyBtn and ashleyBtn.Parent then
+                                ashleyBtn.Visible = true
+                            end
+                        end
+                    end)
+                end)
+            end)
+        end
+    end)
+
+    -- فترة التبريد التلقائية بعد كل ضغطة (0.2 ثانية) سيدي
+    task.spawn(function()
+        task.wait(0.2)
+        isActionCoolingDown = false
+    end)
+end
+
+-- [5] المحرك الرئيسي سيدي (بأعلى أولوية وسرعة تنفيذ قصوى)
+local executionCounter = 0
+RunService:BindToRenderStep("FTAP_LOCK", 300, function(deltaTime)
+    local myChar = player.Character
+    if not myChar or not myChar:FindFirstChild("HumanoidRootPart") then return end
+    
+    -- حساب سرعة حركة الكاميرا سيدي
+    local currentCFrame = Camera.CFrame
+    local angleDifference = math.acos(math.clamp(currentCFrame.LookVector:Dot(lastCameraCFrame.LookVector), -1, 1))
+    cameraVelocity = math.deg(angleDifference) / (deltaTime > 0 and deltaTime or 0.016)
+    lastCameraCFrame = currentCFrame
+    
+    -- تحسين التوزيع الذكي للعمليات لتخفيف الضغط الشبكي المعزول مع الحفاظ على القوة الكاملة
+    executionCounter = (executionCounter + 1) % 2
+
+    -- فحص ملامسة أي جزء من أجزاء جسم اللاعب المحظور للشاشة تلقائياً والضغط الفوري (مشروط بتفعيل DivineWrath)
+    if _G.DivineWrath then 
+        for _, p in pairs(Players:GetPlayers()) do
+            if p ~= player and p.Character and (not _G.BlacklistOnlyMode or blacklistedPlayers[p.Name]) then
+                local pChar = p.Character
+                local root = pChar:FindFirstChild("HumanoidRootPart")
+                if root and (root.Position - myChar.HumanoidRootPart.Position).Magnitude <= _G.AimRange then
+                    for _, part in pairs(pChar:GetChildren()) do
+                        if part:IsA("BasePart") then
+                            local pos, onScreen = Camera:WorldToViewportPoint(part.Position)
+                            if onScreen then
+                                local distFromCenter = (Vector2.new(pos.X, pos.Y) - Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)).Magnitude
+                                if distFromCenter <= _G.FovSize then
+                                    if not isButtonInForbiddenColor() then -- فحص فوري
+                                        if (root.Position - myChar.HumanoidRootPart.Position).Magnitude <= _G.AimRange then
+                                            triggerTargetElement()
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    -- نظام التوجيه المقيد بسرعة حركة الكاميرا سيدي
+    local target, chosenPartPos = nil, nil
+    local selectedPartInstance = nil
+
+    local isMovingFastEnough = not _G.CameraSpeedCheck or (cameraVelocity >= _G.MinCameraVelocity)
+
+    if _G.AimbotEnabled and isMovingFastEnough then
+        if _G.ManualObject then 
+            target = _G.ManualObject.Parent; 
+            chosenPartPos = _G.ManualObject.Position 
+        else
+            local minFov = _G.FovSize
+            for _, obj in pairs(workspace:GetChildren()) do
+                if obj:IsA("Model") and obj ~= myChar and obj:FindFirstChild("Humanoid") and obj.Humanoid.Health > 0 then
+                    local root = obj:FindFirstChild("HumanoidRootPart")
+                    if root and (root.Position - myChar.HumanoidRootPart.Position).Magnitude <= _G.AimRange then
+                        
+                        for _, child in pairs(obj:GetChildren()) do
+                            if child:IsA("BasePart") then
+                                local pos, onScreen = Camera:WorldToViewportPoint(child.Position)
+                                if onScreen then
+                                    local fovDist = (Vector2.new(pos.X, pos.Y) - Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)).Magnitude
+                                    if fovDist < minFov then 
+                                        minFov = fovDist; 
+                                        target = obj;
+                                        selectedPartInstance = child
+                                    end
+                                end
+                            end
+                        end
+
+                    end
+                end
+            end
+        end
+    end
+
+    if selectedPartInstance then
+        if selectedPartInstance ~= currentTargetPart then
+            currentTargetPart = selectedPartInstance
+            local partSize = selectedPartInstance.Size
+            local randomX = (math.random() - 0.5) * (partSize.X * 0.4)
+            local randomY = (math.random() - 0.5) * (partSize.Y * 0.4)
+            local randomZ = (math.random() - 0.5) * (partSize.Z * 0.4)
+            cachedRandomOffset = Vector3.new(randomX, randomY, randomZ)
+        end
+        
+        chosenPartPos = selectedPartInstance.Position + cachedRandomOffset
+    else
+        currentTargetPart = nil
+        cachedRandomOffset = Vector3.new(0, 0, 0)
+    end
+
+    if _G.AimbotEnabled and chosenPartPos and isMovingFastEnough then
+        local highPowerAlpha = 1 -- سرعة قصوى بدون أي تأخير في الحركة
+        Camera.CFrame = Camera.CFrame:Lerp(CFrame.lookAt(Camera.CFrame.Position, chosenPartPos), highPowerAlpha)
+    end
+end)
+
+-- [6] ربط الأزرار والوظائف سيدي
+toggleBtn.MouseButton1Click:Connect(function() 
+    mainFrame.Visible = not mainFrame.Visible 
+end)
+
+aimToggleBtn.MouseButton1Click:Connect(function()
+    _G.AimbotEnabled = not _G.AimbotEnabled
+    aimToggleBtn.Text = _G.AimbotEnabled and "AIMBOT: ON" or "OFF"
+    aimToggleBtn.BackgroundColor3 = _G.AimbotEnabled and Color3.fromRGB(0, 120, 0) or Color3.fromRGB(120, 0, 0)
+end)
+
+objectBtn.MouseButton1Click:Connect(function()
+    if _G.ManualObject then _G.ManualObject = nil end
+end)
+
+rageBtn.MouseButton1Click:Connect(function()
+    _G.RageMode = not _G.RageMode
+    rageBtn.Text = _G.RageMode and "RAGE: ON" or "RAGE: OFF"
+    rageBtn.BackgroundColor3 = _G.RageMode and Color3.fromRGB(180, 0, 0) or Color3.fromRGB(45, 45, 45)
+end)
+
+divineWrathBtn.MouseButton1Click:Connect(function()
+    _G.DivineWrath = not _G.DivineWrath
+    divineWrathBtn.Text = _G.DivineWrath and "DIVINE WRATH: ON" or "DIVINE WRATH: OFF"
+    divineWrathBtn.BackgroundColor3 = _G.DivineWrath and Color3.fromRGB(0, 200, 255) or Color3.fromRGB(150, 150, 150)
+end)
+
+camSpeedBtn.MouseButton1Click:Connect(function()
+    _G.CameraSpeedCheck = not _G.CameraSpeedCheck
+    camSpeedBtn.Text = _G.CameraSpeedCheck and "SPEED LOCK: ON" or "SPEED LOCK: OFF"
+    camSpeedBtn.BackgroundColor3 = _G.CameraSpeedCheck and Color3.fromRGB(0, 120, 120) or Color3.fromRGB(80, 80, 80)
+end)
+
+blacklistOnlyBtn.MouseButton1Click:Connect(function()
+    _G.BlacklistOnlyMode = not _G.BlacklistOnlyMode
+    blacklistOnlyBtn.Text = _G.BlacklistOnlyMode and "BLACKLIST ONLY: ON" or "BLACKLIST ONLY: OFF"
+    blacklistOnlyBtn.BackgroundColor3 = _G.BlacklistOnlyMode and Color3.fromRGB(180, 100, 0) or Color3.fromRGB(80, 80, 80)
+end)
+
+addNearestBtn.MouseButton1Click:Connect(function()
+    local myChar = player.Character
+    if not myChar or not myChar:FindFirstChild("HumanoidRootPart") then return end
+    
+    local nearestPlr = nil
+    local minDist = math.huge
+    
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            local dist = (p.Character.HumanoidRootPart.Position - myChar.HumanoidRootPart.Position).Magnitude
+            if dist < minDist then
+                minDist = dist
+                nearestPlr = p
+            end
+        end
+    end
+    
+    if nearestPlr then
+        blacklistedPlayers[nearestPlr.Name] = true
+        refreshBlacklistGUI()
+    end
+end)
+
+openBlacklistGuiBtn.MouseButton1Click:Connect(function()
+    blacklistFrame.Visible = not blacklistFrame.Visible
+    if blacklistFrame.Visible then refreshBlacklistGUI() end
+end)
+
+manualAddBtn.MouseButton1Click:Connect(function()
+    local text = addInput.Text:lower()
+    if text ~= "" then
+        for _, p in pairs(Players:GetPlayers()) do
+            local pName = p.Name:lower()
+            local pDisplay = p.DisplayName:lower()
+            
+            if string.sub(pName, 1, #text) == text or string.sub(pDisplay, 1, #text) == text or pName:find(text) or pDisplay:find(text) then
+                blacklistedPlayers[p.Name] = true
+            end
+        end
+        addInput.Text = ""
+        refreshBlacklistGUI()
+    end
+end)
+
+distInput.FocusLost:Connect(function() _G.AimRange = tonumber(distInput.Text) or 25 end)
+fovInput.FocusLost:Connect(function() 
+    _G.FovSize = tonumber(fovInput.Text) or 60 
+    fovCircle.Size = UDim2.new(0, _G.FovSize * 2, 0, _G.FovSize * 2)
+end)
