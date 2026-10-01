@@ -1,0 +1,318 @@
+local Players    = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UIS        = game:GetService("UserInputService")
+local LP = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+local MAX_MODELS     = 100
+local HEIGHT         = 6
+local TARGET_NAME    = "FireworkSparkler"
+local STICK_NAME     = "Stick"
+local SCAN_INTERVAL  = 2
+
+local OWNER_RATE     = 0.01
+local OWNER_BATCH    = 25
+
+local CAMERA_FOV     = 120
+local MAX_ZOOM       = 200
+local MIN_ZOOM       = 0.5
+
+local enabled   = false
+local rotSpeed  = 1.5
+local circleR   = 10
+local spinAngle = 0
+
+local grabbed     = {}
+local grabbedList = {}
+local ownerCursor = 0
+
+RunService.RenderStepped:Connect(function()
+	if Camera.FieldOfView ~= CAMERA_FOV then
+		Camera.FieldOfView = CAMERA_FOV
+	end
+	if LP.CameraMode ~= Enum.CameraMode.Classic then
+		LP.CameraMode = Enum.CameraMode.Classic
+	end
+	if LP.CameraMaxZoomDistance ~= MAX_ZOOM then
+		LP.CameraMaxZoomDistance = MAX_ZOOM
+	end
+	if LP.CameraMinZoomDistance ~= MIN_ZOOM then
+		LP.CameraMinZoomDistance = MIN_ZOOM
+	end
+end)
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "FireworkOrbitGui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = LP:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 240, 0, 220)
+frame.Position = UDim2.new(0, 20, 0, 100)
+frame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Parent = screenGui
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
+
+do
+	local dragging, dragStart, startPos
+	frame.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1
+		or input.UserInputType == Enum.UserInputType.Touch then
+			dragging, dragStart, startPos = true, input.Position, frame.Position
+		end
+	end)
+	frame.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1
+		or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = false
+		end
+	end)
+	UIS.InputChanged:Connect(function(input)
+		if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement
+		or input.UserInputType == Enum.UserInputType.Touch) then
+			local d = input.Position - dragStart
+			frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + d.X,
+			                           startPos.Y.Scale, startPos.Y.Offset + d.Y)
+		end
+	end)
+end
+
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1, 0, 0, 28)
+title.BackgroundTransparency = 1
+title.Text = "Firework Orbit"
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 14
+
+local toggleBtn = Instance.new("TextButton", frame)
+toggleBtn.Size = UDim2.new(1, -20, 0, 40)
+toggleBtn.Position = UDim2.new(0, 10, 0, 32)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(60, 180, 75)
+toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleBtn.Font = Enum.Font.GothamBold
+toggleBtn.TextSize = 15
+toggleBtn.Text = "تشغيل"
+Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0, 6)
+
+local radiusLbl = Instance.new("TextLabel", frame)
+radiusLbl.Size = UDim2.new(1, -20, 0, 18)
+radiusLbl.Position = UDim2.new(0, 10, 0, 82)
+radiusLbl.BackgroundTransparency = 1
+radiusLbl.Text = "حجم الدائرة"
+radiusLbl.TextColor3 = Color3.fromRGB(200, 200, 200)
+radiusLbl.Font = Enum.Font.Gotham
+radiusLbl.TextSize = 12
+radiusLbl.TextXAlignment = Enum.TextXAlignment.Right
+
+local radiusBox = Instance.new("TextBox", frame)
+radiusBox.Size = UDim2.new(1, -20, 0, 32)
+radiusBox.Position = UDim2.new(0, 10, 0, 102)
+radiusBox.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
+radiusBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+radiusBox.Font = Enum.Font.Gotham
+radiusBox.TextSize = 14
+radiusBox.Text = "10"
+radiusBox.ClearTextOnFocus = false
+Instance.new("UICorner", radiusBox).CornerRadius = UDim.new(0, 6)
+
+local speedLbl = Instance.new("TextLabel", frame)
+speedLbl.Size = UDim2.new(1, -20, 0, 18)
+speedLbl.Position = UDim2.new(0, 10, 0, 142)
+speedLbl.BackgroundTransparency = 1
+speedLbl.Text = "سرعة التدوير"
+speedLbl.TextColor3 = Color3.fromRGB(200, 200, 200)
+speedLbl.Font = Enum.Font.Gotham
+speedLbl.TextSize = 12
+speedLbl.TextXAlignment = Enum.TextXAlignment.Right
+
+local speedBox = Instance.new("TextBox", frame)
+speedBox.Size = UDim2.new(1, -20, 0, 32)
+speedBox.Position = UDim2.new(0, 10, 0, 162)
+speedBox.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
+speedBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+speedBox.Font = Enum.Font.Gotham
+speedBox.TextSize = 14
+speedBox.Text = "1.5"
+speedBox.ClearTextOnFocus = false
+Instance.new("UICorner", speedBox).CornerRadius = UDim.new(0, 6)
+
+local function isCharacterPart(part)
+	for _, plr in ipairs(Players:GetPlayers()) do
+		local char = plr.Character
+		if char and part:IsDescendantOf(char) then return true end
+	end
+	return false
+end
+
+local function grabModel(model)
+	if grabbed[model] then return end
+	if #grabbedList >= MAX_MODELS then return end
+	if not model:IsA("Model") or model.Name ~= TARGET_NAME then return end
+
+	local stick = model:FindFirstChild(STICK_NAME, true)
+	if not stick or not stick:IsA("BasePart") then return end
+
+	pcall(function() stick:SetNetworkOwner(LP) end)
+
+	local parts, offsets = {}, {}
+	local origAnchored, origCanCollide = {}, {}
+	local pivot = model:GetPivot()
+
+	for _, p in ipairs(model:GetDescendants()) do
+		if p:IsA("BasePart") and not isCharacterPart(p) then
+			table.insert(parts, p)
+			table.insert(offsets, pivot:ToObjectSpace(p.CFrame))
+			table.insert(origAnchored, p.Anchored)
+			table.insert(origCanCollide, p.CanCollide)
+			p.Anchored   = true
+			p.CanCollide = false
+		end
+	end
+	if #parts == 0 then return end
+
+	local entry = {
+		model = model, parts = parts, offsets = offsets,
+		stick = stick,
+		origAnchored = origAnchored, origCanCollide = origCanCollide,
+	}
+	grabbed[model] = entry
+	table.insert(grabbedList, entry)
+end
+
+local function cleanup(entry)
+	for i, p in ipairs(entry.parts) do
+		if p.Parent then
+			p.Anchored   = entry.origAnchored[i]
+			p.CanCollide = entry.origCanCollide[i]
+		end
+	end
+	grabbed[entry.model] = nil
+	for i = #grabbedList, 1, -1 do
+		if grabbedList[i] == entry then table.remove(grabbedList, i) break end
+	end
+end
+
+local function releaseAll()
+	for i = #grabbedList, 1, -1 do cleanup(grabbedList[i]) end
+	grabbed, grabbedList = {}, {}
+	ownerCursor = 0
+end
+
+local function updateToggleUI()
+	if enabled then
+		toggleBtn.Text = "إيقاف"
+		toggleBtn.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
+	else
+		toggleBtn.Text = "تشغيل"
+		toggleBtn.BackgroundColor3 = Color3.fromRGB(60, 180, 75)
+	end
+end
+
+toggleBtn.MouseButton1Click:Connect(function()
+	enabled = not enabled
+	if not enabled then releaseAll() end
+	updateToggleUI()
+end)
+
+speedBox.FocusLost:Connect(function()
+	local n = tonumber(speedBox.Text)
+	if n then rotSpeed = n else speedBox.Text = tostring(rotSpeed) end
+end)
+
+radiusBox.FocusLost:Connect(function()
+	local n = tonumber(radiusBox.Text)
+	if n and n > 1 then circleR = n else radiusBox.Text = tostring(circleR) end
+end)
+
+workspace.DescendantAdded:Connect(function(obj)
+	if not enabled then return end
+	if obj:IsA("Model") and obj.Name == TARGET_NAME then
+		task.defer(grabModel, obj)
+	end
+end)
+
+task.spawn(function()
+	while task.wait(SCAN_INTERVAL) do
+		if not enabled or #grabbedList >= MAX_MODELS then continue end
+		local ok, desc = pcall(function() return workspace:GetDescendants() end)
+		if not ok then continue end
+		for _, obj in ipairs(desc) do
+			if #grabbedList >= MAX_MODELS then break end
+			if obj:IsA("Model") and obj.Name == TARGET_NAME and not grabbed[obj] then
+				grabModel(obj)
+			end
+		end
+	end
+end)
+
+task.spawn(function()
+	while task.wait(OWNER_RATE) do
+		if not enabled then continue end
+		local n = #grabbedList
+		if n == 0 then continue end
+
+		local batch = math.min(OWNER_BATCH, n)
+		for _ = 1, batch do
+			ownerCursor = ownerCursor % n + 1
+			local stick = grabbedList[ownerCursor].stick
+			if stick and stick.Parent then
+				local ok, owner = pcall(function() return stick:GetNetworkOwner() end)
+				if ok and owner ~= LP then
+					pcall(function() stick:SetNetworkOwner(LP) end)
+				end
+			end
+		end
+	end
+end)
+
+local function placeEntry(entry, pos, lookAtPos)
+	local targetPivot = CFrame.lookAt(pos, lookAtPos)
+	for j = 1, #entry.parts do
+		local p = entry.parts[j]
+		if p.Parent then
+			p.CFrame = targetPivot * entry.offsets[j]
+		end
+	end
+end
+
+RunService.Heartbeat:Connect(function(dt)
+	if not enabled then return end
+	local char = LP.Character
+	if not char then return end
+	local head = char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart")
+	if not head then return end
+
+	local count = #grabbedList
+	if count == 0 then return end
+
+	spinAngle = (spinAngle - rotSpeed * dt) % (math.pi * 2)
+
+	local base = head.Position + Vector3.new(0, HEIGHT, 0)
+	local dead = nil
+
+	for i = 1, count do
+		local entry = grabbedList[i]
+		if not entry.model.Parent then
+			dead = dead or {}
+			table.insert(dead, entry)
+		else
+			local angle = spinAngle + ((i - 1) / count) * math.pi * 2
+			local pos = Vector3.new(
+				base.X + math.cos(angle) * circleR,
+				base.Y,
+				base.Z + math.sin(angle) * circleR
+			)
+			local lookDir = Vector3.new(math.cos(angle), 0, math.sin(angle))
+			placeEntry(entry, pos, pos + lookDir)
+		end
+	end
+
+	if dead then
+		for _, e in ipairs(dead) do cleanup(e) end
+	end
+end)
+
+updateToggleUI()
