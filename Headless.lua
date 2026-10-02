@@ -213,7 +213,7 @@
 
 
 https://raw.githubusercontent.com/Hussein516/Script/refs/heads/main/Loserrr.lua
-
+-- bro thinks he got the script finally 
 
 
 
