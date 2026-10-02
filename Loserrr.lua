@@ -147,4 +147,4 @@
 
 
 
-https://raw.githubusercontent.com/Hussein516/Script/refs/heads/main/Loaser
+https://raw.githubusercontent.com/Hussein516/Script/refs/heads/main/Loaser.lua
