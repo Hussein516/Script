@@ -1,4 +1,4 @@
-yea mother fucker loser you think you will get any thing here? lollll
+-- yea mother fucker loser you think you will get any thing here? lollll
 
 
 
@@ -108,29 +108,29 @@ yea mother fucker loser you think you will get any thing here? lollll
 
 
 
-l
+-- l
 
 
 
 
 
 
-o
+-- o
 
 
 
-s
+-- s
 
 
 
 
-e
+-- e
 
 
 
 
 
-r
+-- r
 
 
 
