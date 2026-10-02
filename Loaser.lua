@@ -1,4 +1,4 @@
-keep trying mf🙏🏻😭
+-- keep trying mf🙏🏻😭
 
 
 
@@ -60,7 +60,7 @@ keep trying mf🙏🏻😭
 
 
 
-yea mother fucker loser you think you will get any thing here? lollll
+-- yea mother fucker loser you think you will get any thing here? lollll
 
 
 
