@@ -4,6 +4,7 @@ local UserInputService = game:GetService("UserInputService")
 local Players = game:GetService("Players")
 local SoundService = game:GetService("SoundService")
 local RunService = game:GetService("RunService")
+local TextChatService = game:GetService("TextChatService")
 
 local LocalPlayer = Players.LocalPlayer
 
@@ -120,6 +121,8 @@ local C = {
     accent = Color3.fromRGB(63, 100, 178),
 }
 
+local WHISPER = Color3.fromRGB(150, 95, 205)
+
 local nameColors = {
     Color3.fromRGB(237, 106, 94),
     Color3.fromRGB(95, 168, 255),
@@ -153,6 +156,25 @@ end
 
 local function isMuted(username)
     return settings.muted[tostring(username):lower()] == true
+end
+
+pcall(function()
+    TextChatService.BubbleChatConfiguration.Enabled = true
+end)
+
+local function showBubble(username, text)
+    local plr = Players:FindFirstChild(username)
+    if not plr or not plr:IsA("Player") then
+        return
+    end
+    local char = plr.Character
+    local head = char and char:FindFirstChild("Head")
+    if not head then
+        return
+    end
+    pcall(function()
+        TextChatService:DisplayBubble(head, text)
+    end)
 end
 
 local sgui = new("ScreenGui", {
@@ -321,8 +343,21 @@ local sendBtn = new("TextButton", {
 }, inputRow)
 corner(sendBtn, 6)
 
-local bubble = new("TextButton", {
-    Name = "Bubble",
+local cancelWhisperBtn = new("TextButton", {
+    BackgroundColor3 = C.input,
+    BorderSizePixel = 0,
+    Position = UDim2.new(1, -104, 0, 4),
+    Size = UDim2.new(0, 44, 1, -8),
+    Font = Enum.Font.Gotham,
+    TextSize = 11,
+    TextColor3 = C.dim,
+    Text = "عام",
+    Visible = false,
+}, inputRow)
+corner(cancelWhisperBtn, 6)
+
+local miniBtn = new("TextButton", {
+    Name = "Mini",
     BackgroundColor3 = C.header,
     BackgroundTransparency = 0.1,
     BorderSizePixel = 0,
@@ -335,7 +370,7 @@ local bubble = new("TextButton", {
     Visible = false,
     AutoButtonColor = false,
 }, sgui)
-corner(bubble, 20)
+corner(miniBtn, 20)
 
 local badge = new("TextLabel", {
     BackgroundColor3 = C.red,
@@ -348,7 +383,7 @@ local badge = new("TextLabel", {
     Text = "0",
     Visible = false,
     ZIndex = 3,
-}, bubble)
+}, miniBtn)
 corner(badge, 8)
 
 local notifySound = new("Sound", {
@@ -367,6 +402,7 @@ local typingToken = 0
 local fadeToken = 0
 local lastSend = 0
 local lineOrder = 0
+local whisperTarget = nil
 
 local entries = {}
 local ownById = {}
@@ -393,6 +429,26 @@ local function touch()
             TweenService:Create(panel, TweenInfo.new(0.6), { GroupTransparency = FADE_LEVEL }):Play()
         end
     end)
+end
+
+local function setWhisperTarget(name)
+    if name and name:lower() == LocalPlayer.Name:lower() then
+        return
+    end
+    whisperTarget = name
+    if name then
+        input.Size = UDim2.new(1, -112, 1, -8)
+        cancelWhisperBtn.Visible = true
+        sendBtn.BackgroundColor3 = WHISPER
+        input.PlaceholderText = "همس إلى " .. displayName(name) .. "..."
+        input:CaptureFocus()
+    else
+        input.Size = UDim2.new(1, -64, 1, -8)
+        cancelWhisperBtn.Visible = false
+        sendBtn.BackgroundColor3 = C.accent
+        input.PlaceholderText = "اكتب رسالة..."
+    end
+    touch()
 end
 
 local function savePosition(target)
@@ -441,7 +497,7 @@ local function makeDraggable(handle, target)
 end
 
 makeDraggable(header, panel)
-makeDraggable(bubble, bubble)
+makeDraggable(miniBtn, miniBtn)
 
 local function isAtBottom()
     return scroll.CanvasPosition.Y >= scroll.AbsoluteCanvasSize.Y - scroll.AbsoluteSize.Y - 24
@@ -501,6 +557,14 @@ local function trimLines()
 end
 
 local function renderMessage(e)
+    if e.whisper then
+        local prefix = e.whisper == "out" and "همس إلى " or "همس من "
+        e.label.Text = string.format(
+            '<font color="%s"><b>%s%s</b></font>: %s  <font size="10" color="#6f7580">%s</font>',
+            hex(WHISPER), prefix, esc(displayName(e.username)), esc(e.text), e.time
+        )
+        return
+    end
     local tag = ""
     if e.username == OWNER_USERNAME then
         tag = '<font color="#e5534b">[المالك]</font> '
@@ -612,14 +676,23 @@ local function attachLongPress(e)
         end
         local cancelled = false
         local origin = inp.Position
-        local c = inp.Changed:Connect(function()
-            if inp.UserInputState == Enum.UserInputState.End or (inp.Position - origin).Magnitude > 10 then
+        local began = tick()
+        local c
+        c = inp.Changed:Connect(function()
+            if inp.UserInputState == Enum.UserInputState.End then
+                c:Disconnect()
+                if not cancelled and tick() - began < 0.5 then
+                    setWhisperTarget(e.username)
+                end
+                cancelled = true
+            elseif (inp.Position - origin).Magnitude > 10 then
                 cancelled = true
             end
         end)
         task.delay(0.7, function()
-            c:Disconnect()
             if alive and not cancelled then
+                cancelled = true
+                c:Disconnect()
                 openRename(e.username)
             end
         end)
@@ -665,13 +738,13 @@ end
 local function setCollapsed(v)
     collapsed = v
     if v then
-        bubble.Position = panel.Position
+        miniBtn.Position = panel.Position
         panel.Visible = false
-        bubble.Visible = true
+        miniBtn.Visible = true
     else
-        local x, y = clampPos(bubble.Position.X.Offset, bubble.Position.Y.Offset, panel.AbsoluteSize.X, panel.AbsoluteSize.Y)
+        local x, y = clampPos(miniBtn.Position.X.Offset, miniBtn.Position.Y.Offset, panel.AbsoluteSize.X, panel.AbsoluteSize.Y)
         panel.Position = UDim2.fromOffset(x, y)
-        bubble.Visible = false
+        miniBtn.Visible = false
         panel.Visible = true
         unread = 0
         updateBadge()
@@ -691,6 +764,9 @@ local function addMessage(username, text, id, created, silent)
     typingUsers[username] = nil
     if isMuted(username) then
         return
+    end
+    if not silent then
+        showBubble(username, text)
     end
     local atBottom = isAtBottom()
     local frame, label = makeLine()
@@ -746,6 +822,51 @@ local function addMessage(username, text, id, created, silent)
     end
 end
 
+local function addWhisper(from, to, text, id, created)
+    if id then
+        if processed[id] then
+            return
+        end
+        processed[id] = true
+    end
+    local outgoing = from == LocalPlayer.Name
+    local other = outgoing and to or from
+    if not outgoing and isMuted(from) then
+        return
+    end
+    local atBottom = isAtBottom()
+    local frame, label = makeLine()
+    local e = {
+        kind = "msg",
+        whisper = outgoing and "out" or "in",
+        username = other,
+        text = text,
+        time = os.date("%H:%M", created and math.floor(created / 1000) or os.time()),
+        frame = frame,
+        label = label,
+        seenSet = {},
+        seenOrder = {},
+    }
+    renderMessage(e)
+    table.insert(entries, e)
+    attachLongPress(e)
+    trimLines()
+    stickToBottom(atBottom or outgoing)
+    showBubble(from, text)
+    if not outgoing then
+        typingUsers[from] = nil
+        if settings.sound then
+            pcall(function() notifySound:Play() end)
+        end
+        if collapsed then
+            unread += 1
+            updateBadge()
+        else
+            touch()
+        end
+    end
+end
+
 local function updateTyping(dots)
     local names = {}
     for name in pairs(typingUsers) do
@@ -788,7 +909,11 @@ local function setStatus(state)
         color = C.red
     end
     TweenService:Create(statusDot, TweenInfo.new(0.25), { BackgroundColor3 = color }):Play()
-    input.PlaceholderText = state == "connected" and "اكتب رسالة..." or "غير متصل..."
+    if whisperTarget and state == "connected" then
+        input.PlaceholderText = "همس إلى " .. displayName(whisperTarget) .. "..."
+    else
+        input.PlaceholderText = state == "connected" and "اكتب رسالة..." or "غير متصل..."
+    end
 end
 
 local function setTyping(v)
@@ -801,7 +926,7 @@ end
 
 bind(input:GetPropertyChangedSignal("Text"), function()
     typingToken += 1
-    if input.Text ~= "" then
+    if input.Text ~= "" and not whisperTarget then
         local my = typingToken
         if tick() - lastTypingSend > 2 then
             lastTypingSend = tick()
@@ -877,6 +1002,24 @@ local function submit()
         writeJson(SETTINGS_FILE, settings)
         return
     end
+    if cmd == "w" or cmd == "whisper" then
+        local name, body = arg:match("^(%S+)%s+(.+)$")
+        if not name then
+            if arg ~= "" then
+                setWhisperTarget(resolveName(arg))
+            else
+                addSystem("الاستخدام: /w اسم الرسالة")
+            end
+            return
+        end
+        if not isConnected then
+            addSystem("غير متصل حاليًا، لم يتم إرسال الرسالة", "#de5e56")
+            return
+        end
+        lastSend = tick()
+        sendJson({ type = "whisper", username = LocalPlayer.Name, target = resolveName(name), message = body })
+        return
+    end
     if not isConnected then
         addSystem("غير متصل حاليًا، لم يتم إرسال الرسالة", "#de5e56")
         return
@@ -885,7 +1028,11 @@ local function submit()
         return
     end
     lastSend = tick()
-    sendJson({ type = "message", username = LocalPlayer.Name, message = text })
+    if whisperTarget and text:sub(1, 1) ~= "/" then
+        sendJson({ type = "whisper", username = LocalPlayer.Name, target = whisperTarget, message = text })
+    else
+        sendJson({ type = "message", username = LocalPlayer.Name, message = text })
+    end
 end
 
 bind(input.FocusLost, function(enterPressed)
@@ -901,11 +1048,15 @@ bind(sendBtn.MouseButton1Click, function()
     submit()
 end)
 
+bind(cancelWhisperBtn.MouseButton1Click, function()
+    setWhisperTarget(nil)
+end)
+
 bind(hideBtn.MouseButton1Click, function()
     setCollapsed(true)
 end)
 
-bind(bubble.MouseButton1Click, function()
+bind(miniBtn.MouseButton1Click, function()
     if tick() - dragEndedAt < 0.2 then
         return
     end
@@ -1064,6 +1215,13 @@ local function handleMessage(message)
             if before <= 1 and msg.username ~= LocalPlayer.Name and not isMuted(msg.username) then
                 addSystem("انقطع اتصال " .. displayName(msg.username), "#c9776f")
             end
+        end
+        return
+    end
+
+    if msg.type == "whisper" then
+        if msg.from and msg.to and msg.message then
+            addWhisper(msg.from, msg.to, msg.message, msg.id, msg.created_at)
         end
         return
     end
