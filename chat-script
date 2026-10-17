@@ -1,3 +1,4 @@
+-- حسبي الله ونعمل وكيل لا تسرق يا كلب
 local HttpService = game:GetService("HttpService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
@@ -5,6 +6,7 @@ local Players = game:GetService("Players")
 local SoundService = game:GetService("SoundService")
 local RunService = game:GetService("RunService")
 local TextChatService = game:GetService("TextChatService")
+local ContentProvider = game:GetService("ContentProvider")
 
 local LocalPlayer = Players.LocalPlayer
 
@@ -13,6 +15,8 @@ local OWNER_USERNAME = "maalek_1234"
 local TOKEN_FILE = "OwnerToken.txt"
 local ALIAS_FILE = "ChatAliases.json"
 local SETTINGS_FILE = "ChatSettings.json"
+local LOGO_FILE = "ChatLogo"
+local LOGO_IDS = { 127504827820827, 111988512514626 }
 local RECONNECT_MAX = 30
 local MAX_LINES = 120
 local MAX_LEN = 300
@@ -242,33 +246,47 @@ local statusDot = new("Frame", {
 }, header)
 corner(statusDot, 4)
 
+local titleBox = new("Frame", {
+    BackgroundTransparency = 1,
+    Position = UDim2.new(0, 24, 0, 0),
+    Size = UDim2.new(0, 0, 1, 0),
+    AutomaticSize = Enum.AutomaticSize.X,
+    ClipsDescendants = true,
+}, header)
+new("UISizeConstraint", { MaxSize = Vector2.new(144, 28) }, titleBox)
+new("UIListLayout", {
+    FillDirection = Enum.FillDirection.Horizontal,
+    VerticalAlignment = Enum.VerticalAlignment.Center,
+    SortOrder = Enum.SortOrder.LayoutOrder,
+    Padding = UDim.new(0, 5),
+}, titleBox)
+
 new("TextLabel", {
     BackgroundTransparency = 1,
-    Size = UDim2.new(0, 40, 1, 0),
-    Position = UDim2.new(0, 24, 0, 0),
+    Size = UDim2.new(0, 0, 1, 0),
+    AutomaticSize = Enum.AutomaticSize.X,
     Font = Enum.Font.GothamMedium,
-    TextSize = 13,
+    TextSize = 12,
     TextColor3 = C.text,
-    TextXAlignment = Enum.TextXAlignment.Left,
-    Text = "الشات",
-}, header)
+    Text = "شات جنرال ميو🇷🇺🇮🇶",
+    LayoutOrder = 1,
+}, titleBox)
 
-local countLabel = new("TextLabel", {
-    BackgroundTransparency = 1,
-    Size = UDim2.new(0, 80, 1, 0),
-    Position = UDim2.new(0, 66, 0, 0),
-    Font = Enum.Font.Gotham,
-    TextSize = 11,
-    TextColor3 = C.dim,
-    TextXAlignment = Enum.TextXAlignment.Left,
-    Text = "",
-}, header)
+local logo = new("ImageLabel", {
+    BackgroundColor3 = C.input,
+    BorderSizePixel = 0,
+    Size = UDim2.fromOffset(18, 18),
+    Image = "",
+    ScaleType = Enum.ScaleType.Crop,
+    LayoutOrder = 2,
+}, titleBox)
+new("UICorner", { CornerRadius = UDim.new(0.5, 0) }, logo)
 
 local function headerButton(text, index)
     return new("TextButton", {
         BackgroundTransparency = 1,
-        Size = UDim2.new(0, 38, 1, 0),
-        Position = UDim2.new(1, -38 * index, 0, 0),
+        Size = UDim2.new(0, 34, 1, 0),
+        Position = UDim2.new(1, -34 * index, 0, 0),
         Font = Enum.Font.Gotham,
         TextSize = 11,
         TextColor3 = C.dim,
@@ -391,6 +409,110 @@ local notifySound = new("Sound", {
     Volume = 0.5,
 }, SoundService)
 
+local function httpGet(url)
+    local req = (syn and syn.request) or http_request or request or (http and http.request)
+    if req then
+        local ok, res = pcall(req, { Url = url, Method = "GET" })
+        if ok and type(res) == "table" and type(res.Body) == "string" and (res.StatusCode == nil or res.StatusCode == 200) then
+            return res.Body
+        end
+    end
+    local ok, body = pcall(function()
+        return game:HttpGet(url)
+    end)
+    if ok and type(body) == "string" then
+        return body
+    end
+    return nil
+end
+
+local function imageExt(body)
+    if body:sub(1, 4) == "\137PNG" then
+        return ".png"
+    end
+    if body:sub(1, 2) == "\255\216" then
+        return ".jpg"
+    end
+    return nil
+end
+
+local function fetchImage(id)
+    local current = tostring(id)
+    for _ = 1, 3 do
+        local body = httpGet("https://assetdelivery.roblox.com/v1/asset/?id=" .. current)
+        if not body or #body < 8 then
+            return nil
+        end
+        local ext = imageExt(body)
+        if ext then
+            return body, ext
+        end
+        local nextId = body:match("id=(%d+)") or body:match("rbxassetid://(%d+)")
+        if not nextId or nextId == current then
+            return nil
+        end
+        current = nextId
+    end
+    return nil
+end
+
+local function useLogoFile(path)
+    local getAsset = getcustomasset or getsynasset
+    if not getAsset then
+        return false
+    end
+    local ok, url = pcall(getAsset, path)
+    if ok and type(url) == "string" and url ~= "" then
+        logo.Image = url
+        return true
+    end
+    return false
+end
+
+local function loadLogo()
+    if isfile then
+        for _, ext in ipairs({ ".png", ".jpg" }) do
+            if isfile(LOGO_FILE .. ext) and useLogoFile(LOGO_FILE .. ext) then
+                return
+            end
+        end
+    end
+    if writefile then
+        for _, id in ipairs(LOGO_IDS) do
+            if not alive then
+                return
+            end
+            local body, ext = fetchImage(id)
+            if body then
+                local path = LOGO_FILE .. ext
+                local saved = pcall(writefile, path, body)
+                if saved and useLogoFile(path) then
+                    return
+                end
+            end
+        end
+    end
+    for _, id in ipairs(LOGO_IDS) do
+        if not alive then
+            return
+        end
+        logo.Image = "rbxassetid://" .. id
+        local good = false
+        pcall(function()
+            ContentProvider:PreloadAsync({ logo }, function(_, status)
+                good = status == Enum.AssetFetchStatus.Success
+            end)
+        end)
+        if good then
+            return
+        end
+    end
+end
+
+task.spawn(function()
+    pcall(loadLogo)
+end)
+
 local collapsed = false
 local unread = 0
 local pendingSeen = {}
@@ -403,6 +525,9 @@ local fadeToken = 0
 local lastSend = 0
 local lineOrder = 0
 local whisperTarget = nil
+local onlineText = ""
+local autoScroll = true
+local expectedY = 0
 
 local entries = {}
 local ownById = {}
@@ -432,7 +557,7 @@ local function touch()
 end
 
 local function setWhisperTarget(name)
-    if name and name:lower() == LocalPlayer.Name:lower() then
+    if name and name:lower() == LocalPlayer.Name:lower() and not hasAuthed then
         return
     end
     whisperTarget = name
@@ -499,19 +624,34 @@ end
 makeDraggable(header, panel)
 makeDraggable(miniBtn, miniBtn)
 
-local function isAtBottom()
-    return scroll.CanvasPosition.Y >= scroll.AbsoluteCanvasSize.Y - scroll.AbsoluteSize.Y - 24
+local function scrollToBottom()
+    local y = math.max(0, scroll.AbsoluteCanvasSize.Y - scroll.AbsoluteSize.Y)
+    expectedY = y
+    scroll.CanvasPosition = Vector2.new(0, y)
 end
 
-local function stickToBottom(should)
-    if not should then
+bind(scroll:GetPropertyChangedSignal("CanvasPosition"), function()
+    local y = scroll.CanvasPosition.Y
+    if autoScroll and math.abs(y - expectedY) < 2 then
+        return
+    end
+    local dist = scroll.AbsoluteCanvasSize.Y - scroll.AbsoluteSize.Y - y
+    autoScroll = dist <= 8
+end)
+
+local function stickToBottom(force)
+    if force then
+        autoScroll = true
+    end
+    if not autoScroll then
         return
     end
     task.spawn(function()
         RunService.Heartbeat:Wait()
         RunService.Heartbeat:Wait()
-        if alive and scroll.Parent then
-            scroll.CanvasPosition = Vector2.new(0, math.max(0, scroll.AbsoluteCanvasSize.Y - scroll.AbsoluteSize.Y))
+        RunService.Heartbeat:Wait()
+        if alive and autoScroll and scroll.Parent then
+            scrollToBottom()
         end
     end)
 end
@@ -700,13 +840,12 @@ local function attachLongPress(e)
 end
 
 local function addSystem(text, color)
-    local atBottom = isAtBottom()
     local frame, label = makeLine()
     label.TextSize = 12
     label.Text = string.format('<font color="%s">%s</font>', color or "#8a909c", esc(text))
     table.insert(entries, { kind = "sys", frame = frame, label = label })
     trimLines()
-    stickToBottom(atBottom)
+    stickToBottom(false)
 end
 
 local function updateCount()
@@ -716,7 +855,7 @@ local function updateCount()
             n += 1
         end
     end
-    countLabel.Text = n > 0 and ("متصل: " .. n) or ""
+    onlineText = n > 0 and ("متصل: " .. n) or ""
 end
 
 local function updateBadge()
@@ -750,7 +889,7 @@ local function setCollapsed(v)
         updateBadge()
         flushSeen()
         touch()
-        stickToBottom(true)
+        stickToBottom(false)
     end
 end
 
@@ -768,7 +907,6 @@ local function addMessage(username, text, id, created, silent)
     if not silent then
         showBubble(username, text)
     end
-    local atBottom = isAtBottom()
     local frame, label = makeLine()
     local stamp = os.date("%H:%M", created and math.floor(created / 1000) or os.time())
     local e = {
@@ -802,7 +940,7 @@ local function addMessage(username, text, id, created, silent)
     table.insert(entries, e)
     attachLongPress(e)
     trimLines()
-    stickToBottom(atBottom or own)
+    stickToBottom(own and not silent)
     if not silent and not own then
         if settings.sound then
             pcall(function() notifySound:Play() end)
@@ -834,7 +972,6 @@ local function addWhisper(from, to, text, id, created)
     if not outgoing and isMuted(from) then
         return
     end
-    local atBottom = isAtBottom()
     local frame, label = makeLine()
     local e = {
         kind = "msg",
@@ -851,7 +988,7 @@ local function addWhisper(from, to, text, id, created)
     table.insert(entries, e)
     attachLongPress(e)
     trimLines()
-    stickToBottom(atBottom or outgoing)
+    stickToBottom(outgoing)
     showBubble(from, text)
     if not outgoing then
         typingUsers[from] = nil
@@ -876,7 +1013,7 @@ local function updateTyping(dots)
     end
     local suffix = string.rep(".", dots or 1)
     if #names == 0 then
-        typingLabel.Text = ""
+        typingLabel.Text = onlineText
     elseif #names == 1 then
         typingLabel.Text = names[1] .. " يكتب" .. suffix
     elseif #names == 2 then
@@ -1075,7 +1212,7 @@ bind(sizeBtn.MouseButton1Click, function()
     task.delay(0.25, function()
         if alive then
             savePosition(panel)
-            stickToBottom(true)
+            stickToBottom(false)
         end
     end)
     touch()
