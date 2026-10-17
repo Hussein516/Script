@@ -1,4 +1,4 @@
--- حسبي الله ونعمل وكيل لا تسرق يا كلب
+-- حسبي الله ونعمل وكيل لا تسرق يا كلب 
 local HttpService = game:GetService("HttpService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
