@@ -1,373 +1,521 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local CoreGui = game:GetService("CoreGui")
+local lp = Players.LocalPlayer
+local env = (getgenv and getgenv()) or _G
+
+if env.__BanSceneCleanup then pcall(env.__BanSceneCleanup) end
+
+local DISTANCE = 3
+local SPEED = 2
+local BLOOD_WAIT = 0.23
+local KICK_REASON = "تم الطرد بواسطة السكريبت"
+
+local Data={Name="maalek_1234",UserId=7028889748,Rig="R6",Props={["Head"]=109762737899694,["Torso"]=27112025,["LeftArm"]=27112052,["RightArm"]=27112039,["LeftLeg"]=27112056,["RightLeg"]=27112068,["Face"]=0,["Shirt"]=99756888107334,["Pants"]=130685863161064,["GraphicTShirt"]=7654811214,["ClimbAnimation"]=123695349157584,["FallAnimation"]=93993406355955,["IdleAnimation"]=126354114956642,["JumpAnimation"]=115715495289805,["RunAnimation"]=124765145869332,["SwimAnimation"]=106537993816942,["WalkAnimation"]=106810508343012,["MoodAnimation"]=14618207727,["HeightScale"]=1,["WidthScale"]=1,["DepthScale"]=1,["HeadScale"]=1,["BodyTypeScale"]=0,["ProportionScale"]=0,["HeadColor"]=Color3.new(0.0666666701,0.0666666701,0.0666666701),["TorsoColor"]=Color3.new(0.70588237,0.227450982,0.203921571),["LeftArmColor"]=Color3.new(0.70588237,0.227450982,0.203921571),["RightArmColor"]=Color3.new(0.70588237,0.227450982,0.203921571),["LeftLegColor"]=Color3.new(0.97647059,0.97647059,0.97647059),["RightLegColor"]=Color3.new(0.97647059,0.97647059,0.97647059)},Accessories={}}
+
 local DATA={["Left Hip"]={{0.00000,0.00000,0.00000,0.00000,0.00000,0.00000,0.00000,"Linear","InOut"},{0.26667,-0.42000,0.00000,0.00000,0.00000,0.00000,-22.06000,"Linear","InOut"}},["Left Shoulder"]={{0.00000,0.00000,0.00000,0.00000,0.00000,0.00000,0.00000,"Linear","InOut"},{0.26667,0.00000,-0.41000,-0.33000,0.00000,-77.10000,-149.25999,"Linear","InOut"},{0.53333,-0.27000,-0.28000,-0.33000,0.00000,-56.26000,-42.30000,"Linear","InOut"}},["Neck"]={{0.00000,0.00000,0.00000,0.00000,0.00000,0.00000,0.00000,"Linear","InOut"},{0.26667,0.00000,0.00000,0.00000,-41.29000,0.00000,0.00000,"Linear","InOut"},{0.53333,0.00000,0.00000,0.00000,11.56000,0.00000,0.00000,"Linear","InOut"}},["P:Ban Hammer"]={{0.00000,-0.16000,-1.57000,0.79000,-90.00000,0.00000,0.00000,"Linear","InOut"},{0.03333,-0.54000,-1.49000,0.95000,-74.65625,0.00000,0.00000,"Linear","InOut"},{0.06667,-0.96000,-0.84000,0.44000,-59.31250,0.00000,0.00000,"Linear","InOut"},{0.10000,-1.06833,-0.09000,0.43000,-43.96875,0.00000,0.00000,"Linear","InOut"},{0.13333,-1.55000,0.75000,0.75000,-28.62499,0.00000,0.00000,"Linear","InOut"},{0.26667,-1.61000,3.14000,3.22000,32.75000,0.00000,0.00000,"Linear","InOut"},{0.53333,-1.64000,-1.31000,0.43000,-114.98000,0.00000,0.00000,"Sine","InOut"}},["Right Hip"]={{0.00000,0.00000,0.00000,0.00000,0.00000,0.00000,0.00000,"Linear","InOut"},{0.26667,0.42000,0.00000,0.00000,0.00000,0.00000,-5.73000,"Linear","InOut"}},["Right Shoulder"]={{0.00000,0.00000,0.00000,0.00000,0.00000,0.00000,0.00000,"Linear","InOut"},{0.26667,0.00000,-0.41000,-0.33000,0.00000,77.10000,149.25999,"Sine","InOut"},{0.53333,0.27000,-0.28000,-0.33000,0.00000,56.26000,42.30000,"Quad","InOut"}},["RootJoint"]={{0.00000,0.00000,0.00000,0.00000,0.00000,0.00000,0.00000,"Linear","InOut"},{0.26667,0.00000,1.08000,1.41000,-22.36000,0.00000,0.00000,"Sine","InOut"},{0.43333,0.00000,1.08000,1.41000,26.78000,0.00000,0.00000,"Quart","InOut"}}}
 local PROPS={{["attach"]="Free",["name"]="Ban Hammer",["parts"]={{["b"]=165.00000,["g"]=162.00000,["mat"]="Plastic",["mesh"]="http://www.roblox.com/asset/?id=10604848",["mnx"]=3.61327,["mny"]=9.50665,["mnz"]=5.60000,["mox"]=0.00000,["moy"]=0.00000,["moz"]=0.00000,["msx"]=1.00000,["msy"]=1.00000,["msz"]=1.00000,["mt"]="FileMesh",["px"]=0.00000,["py"]=0.00000,["pz"]=0.00000,["r"]=163.00000,["refl"]=0.00000,["rx"]=0.00000,["ry"]=0.00000,["rz"]=0.00000,["shape"]="Block",["sx"]=1.85282,["sy"]=4.87485,["sz"]=2.87159,["tex"]="http://www.roblox.com/asset/?id=10605252",["tr"]=0.00000,["vx"]=0.63900,["vy"]=0.63500,["vz"]=0.64700}},["px"]=1.60000,["py"]=0.60000,["pz"]=-1.80000,["rx"]=0.00000,["ry"]=0.00000,["rz"]=0.00000}}
 local FXS={{["dir"]="Out",["dur"]=0.00000,["ease"]="Quad",["fade"]=1.00000,["ground"]=true,["hold"]=2.00000,["lift"]=0.00000,["mode"]="Character",["name"]="hh",["ox"]=0.00000,["oy"]=0.00000,["oz"]=-3.00000,["parts"]={{["arx"]=0.00000,["ary"]=43.30292,["arz"]=0.00000,["ax"]=2.28548,["ay"]=-0.15000,["az"]=2.42506,["b"]=24.00000,["brx"]=0.00000,["bry"]=43.30292,["brz"]=0.00000,["bx"]=2.28548,["by"]=0.03000,["bz"]=2.42506,["dl"]=0.00000,["g"]=25.00000,["mat"]="Slate",["r"]=25.00000,["shape"]="Block",["sx"]=0.25000,["sy"]=0.12000,["sz"]=6.06463,["tr"]=0.00000},{["arx"]=0.00000,["ary"]=9.72690,["arz"]=0.00000,["ax"]=0.49514,["ay"]=-0.15000,["az"]=2.88859,["b"]=22.00000,["brx"]=0.00000,["bry"]=9.72690,["brz"]=0.00000,["bx"]=0.49514,["by"]=0.03000,["bz"]=2.88859,["dl"]=0.00000,["g"]=31.00000,["mat"]="Slate",["r"]=16.00000,["shape"]="Block",["sx"]=0.25000,["sy"]=0.12000,["sz"]=5.26144,["tr"]=0.00000},{["arx"]=0.00000,["ary"]=-34.80127,["arz"]=0.00000,["ax"]=-1.32819,["ay"]=-0.15000,["az"]=1.91092,["b"]=26.00000,["brx"]=0.00000,["bry"]=-34.80127,["brz"]=0.00000,["bx"]=-1.32819,["by"]=0.03000,["bz"]=1.91092,["dl"]=0.00000,["g"]=22.00000,["mat"]="Slate",["r"]=33.00000,["shape"]="Block",["sx"]=0.25000,["sy"]=0.12000,["sz"]=4.05433,["tr"]=0.00000},{["arx"]=0.00000,["ary"]=-90.87004,["arz"]=0.00000,["ax"]=-3.73417,["ay"]=-0.15000,["az"]=-0.05672,["b"]=30.00000,["brx"]=0.00000,["bry"]=-90.87004,["brz"]=0.00000,["bx"]=-3.73417,["by"]=0.03000,["bz"]=-0.05672,["dl"]=0.00000,["g"]=26.00000,["mat"]="Slate",["r"]=31.00000,["shape"]="Block",["sx"]=0.25000,["sy"]=0.12000,["sz"]=6.86921,["tr"]=0.00000},{["arx"]=0.00000,["ary"]=-140.94871,["arz"]=0.00000,["ax"]=-1.85607,["ay"]=-0.15000,["az"]=-2.28789,["b"]=40.00000,["brx"]=0.00000,["bry"]=-140.94871,["brz"]=0.00000,["bx"]=-1.85607,["by"]=0.03000,["bz"]=-2.28789,["dl"]=0.00000,["g"]=18.00000,["mat"]="Slate",["r"]=33.00000,["shape"]="Block",["sx"]=0.25000,["sy"]=0.12000,["sz"]=5.29218,["tr"]=0.00000},{["arx"]=0.00000,["ary"]=-189.70380,["arz"]=0.00000,["ax"]=0.36417,["ay"]=-0.15000,["az"]=-2.12956,["b"]=33.00000,["brx"]=0.00000,["bry"]=-189.70380,["brz"]=0.00000,["bx"]=0.36417,["by"]=0.03000,["bz"]=-2.12956,["dl"]=0.00000,["g"]=27.00000,["mat"]="Slate",["r"]=28.00000,["shape"]="Block",["sx"]=0.25000,["sy"]=0.12000,["sz"]=3.72094,["tr"]=0.00000},{["arx"]=0.00000,["ary"]=-219.91866,["arz"]=0.00000,["ax"]=2.36035,["ay"]=-0.15000,["az"]=-2.82106,["b"]=35.00000,["brx"]=0.00000,["bry"]=-219.91866,["brz"]=0.00000,["bx"]=2.36035,["by"]=0.03000,["bz"]=-2.82106,["dl"]=0.00000,["g"]=19.00000,["mat"]="Slate",["r"]=32.00000,["shape"]="Block",["sx"]=0.25000,["sy"]=0.12000,["sz"]=6.75653,["tr"]=0.00000},{["arx"]=0.00000,["ary"]=-270.39563,["arz"]=0.00000,["ax"]=2.89322,["ay"]=-0.15000,["az"]=0.01999,["b"]=24.00000,["brx"]=0.00000,["bry"]=-270.39563,["brz"]=0.00000,["bx"]=2.89322,["by"]=0.03000,["bz"]=0.01999,["dl"]=0.00000,["g"]=28.00000,["mat"]="Slate",["r"]=33.00000,["shape"]="Block",["sx"]=0.25000,["sy"]=0.12000,["sz"]=5.18658,["tr"]=0.00000}},["t"]=0.53333}}
 local LENGTH=2.00000
 local LOOP=false
-local Players=game:GetService("Players")
-local RunService=game:GetService("RunService")
-local TweenService=game:GetService("TweenService")
-local player=Players.LocalPlayer
-local env=(getgenv and getgenv()) or _G
-if env.__FakeAnimStop then pcall(env.__FakeAnimStop) end
-if env.__FakeAnimGui then pcall(function() env.__FakeAnimGui:Destroy() end) end
-local function partCF(p)
-	return CFrame.new(p.px,p.py,p.pz)*CFrame.fromEulerAnglesXYZ(math.rad(p.rx),math.rad(p.ry),math.rad(p.rz))
+
+local function set(o,k,v) pcall(function() o[k]=v end) end
+local function attach(g)
+    local parent=nil
+    pcall(function() parent=gethui() end)
+    if not parent then parent=CoreGui end
+    local ok=pcall(function() g.Parent=parent end)
+    if not ok or not g.Parent then g.Parent=lp:WaitForChild("PlayerGui") end
 end
+local function BuildDescription()
+    local d=Instance.new("HumanoidDescription")
+    for k,v in pairs(Data.Props) do pcall(function() d[k]=v end) end
+    pcall(function() d:SetAccessories(Data.Accessories,true) end)
+    return d
+end
+local function IsValidModel(m)
+    if not m then return false end
+    if not m:FindFirstChildOfClass("Humanoid") then return false end
+    if not m:FindFirstChild("HumanoidRootPart") then return false end
+    if not m:FindFirstChild("Head") then return false end
+    return true
+end
+local function EnsureClothes(m)
+    if Data.Props.Shirt and Data.Props.Shirt>0 and not m:FindFirstChildOfClass("Shirt") then
+        local s=Instance.new("Shirt"); s.ShirtTemplate="rbxassetid://"..tostring(Data.Props.Shirt); s.Parent=m
+    end
+    if Data.Props.Pants and Data.Props.Pants>0 and not m:FindFirstChildOfClass("Pants") then
+        local p=Instance.new("Pants"); p.PantsTemplate="rbxassetid://"..tostring(Data.Props.Pants); p.Parent=m
+    end
+end
+local function BuildModel()
+    local rig=Enum.HumanoidRigType[Data.Rig]
+    for _=1,5 do
+        local ok,m=pcall(function() return Players:CreateHumanoidModelFromDescription(BuildDescription(),rig) end)
+        if ok and IsValidModel(m) then
+            local hum=m:FindFirstChildOfClass("Humanoid")
+            if hum and not hum:FindFirstChildOfClass("Animator") then
+                local an=Instance.new("Animator"); an.Parent=hum
+            end
+            EnsureClothes(m); return m
+        end
+        if m then pcall(function() m:Destroy() end) end
+        task.wait(0.3)
+    end
+    local ok2,desc=pcall(function() return Players:GetHumanoidDescriptionFromUserId(Data.UserId) end)
+    if ok2 and desc then
+        for _=1,3 do
+            local ok,m=pcall(function() return Players:CreateHumanoidModelFromDescription(desc,rig) end)
+            if ok and IsValidModel(m) then EnsureClothes(m); return m end
+            if m then pcall(function() m:Destroy() end) end
+            task.wait(0.3)
+        end
+    end
+    return nil
+end
+local function rayGround(pos,ignore)
+    local params=RaycastParams.new()
+    params.FilterType=Enum.RaycastFilterType.Exclude
+    params.FilterDescendantsInstances=ignore
+    local r=workspace:Raycast(pos+Vector3.new(0,8,0),Vector3.new(0,-120,0),params)
+    return r and r.Position or nil
+end
+local function partCF(p) return CFrame.new(p.px,p.py,p.pz)*CFrame.fromEulerAnglesXYZ(math.rad(p.rx),math.rad(p.ry),math.rad(p.rz)) end
 local function newPart(p,anchored)
-	local o=Instance.new(p.shape=="Wedge" and "WedgePart" or "Part")
-	if p.shape=="Ball" then
-		o.Shape=Enum.PartType.Ball
-	elseif p.shape=="Cylinder" then
-		o.Shape=Enum.PartType.Cylinder
-	end
-	o.Name="FAPart"
-	o.Size=Vector3.new(math.max(p.sx,0.05),math.max(p.sy,0.05),math.max(p.sz,0.05))
-	o.Color=Color3.fromRGB(p.r,p.g,p.b)
-	o.Transparency=p.tr or 0
-	o.Reflectance=p.refl or 0
-	pcall(function() o.Material=Enum.Material[p.mat] end)
-	o.Anchored=anchored
-	o.CanCollide=false
-	o.CanTouch=false
-	o.CanQuery=false
-	o.Massless=true
-	if p.mt then
-		pcall(function()
-			local sm=Instance.new("SpecialMesh")
-			sm.MeshType=Enum.MeshType[p.mt]
-			if p.mesh and p.mesh~="" then sm.MeshId=p.mesh end
-			if p.tex and p.tex~="" then sm.TextureId=p.tex end
-			if p.mnx and p.mnx>0 and p.mny and p.mny>0 and p.mnz and p.mnz>0 then
-				sm.Scale=Vector3.new(p.sx/p.mnx,p.sy/p.mny,p.sz/p.mnz)
-			else
-				sm.Scale=Vector3.new(p.msx or 1,p.msy or 1,p.msz or 1)
-			end
-			sm.Offset=Vector3.new(p.mox or 0,p.moy or 0,p.moz or 0)
-			sm.VertexColor=Vector3.new(p.vx or 1,p.vy or 1,p.vz or 1)
-			sm.Parent=o
-		end)
-	end
-	if p.dec then
-		for _,d in ipairs(p.dec) do
-			pcall(function()
-				local x=Instance.new(d.c=="Texture" and "Texture" or "Decal")
-				x.Face=Enum.NormalId[d.f]
-				x.Texture=d.t
-				x.Transparency=d.tr or 0
-				if d.c=="Texture" then
-					x.StudsPerTileU=d.u or 2
-					x.StudsPerTileV=d.v or 2
-				end
-				x.Parent=o
-			end)
-		end
-	end
-	return o
+    local o=Instance.new(p.shape=="Wedge" and "WedgePart" or "Part")
+    if p.shape=="Ball" then o.Shape=Enum.PartType.Ball
+    elseif p.shape=="Cylinder" then o.Shape=Enum.PartType.Cylinder end
+    o.Name="FAPart"
+    o.Size=Vector3.new(math.max(p.sx,0.05),math.max(p.sy,0.05),math.max(p.sz,0.05))
+    o.Color=Color3.fromRGB(p.r,p.g,p.b)
+    o.Transparency=p.tr or 0; o.Reflectance=p.refl or 0
+    pcall(function() o.Material=Enum.Material[p.mat] end)
+    o.Anchored=anchored; o.CanCollide=false; o.CanTouch=false; o.CanQuery=false; o.Massless=true
+    if p.mt then
+        pcall(function()
+            local sm=Instance.new("SpecialMesh"); sm.MeshType=Enum.MeshType[p.mt]
+            if p.mesh and p.mesh~="" then sm.MeshId=p.mesh end
+            if p.tex and p.tex~="" then sm.TextureId=p.tex end
+            if p.mnx and p.mnx>0 and p.mny and p.mny>0 and p.mnz and p.mnz>0 then
+                sm.Scale=Vector3.new(p.sx/p.mnx,p.sy/p.mny,p.sz/p.mnz)
+            else sm.Scale=Vector3.new(p.msx or 1,p.msy or 1,p.msz or 1) end
+            sm.Offset=Vector3.new(p.mox or 0,p.moy or 0,p.moz or 0)
+            sm.VertexColor=Vector3.new(p.vx or 1,p.vy or 1,p.vz or 1)
+            sm.Parent=o
+        end)
+    end
+    if p.dec then
+        for _,d in ipairs(p.dec) do
+            pcall(function()
+                local x=Instance.new(d.c=="Texture" and "Texture" or "Decal")
+                x.Face=Enum.NormalId[d.f]; x.Texture=d.t; x.Transparency=d.tr or 0
+                if d.c=="Texture" then x.StudsPerTileU=d.u or 2; x.StudsPerTileV=d.v or 2 end
+                x.Parent=o
+            end)
+        end
+    end
+    return o
 end
 local function buildPropLive(d,char,folder)
-	local target=char:FindFirstChild(d.attach,true)
-	if d.attach=="Free" or not (target and target:IsA("BasePart")) then
-		target=char:FindFirstChild("HumanoidRootPart")
-	end
-	local base=CFrame.new(d.px,d.py,d.pz)*CFrame.fromEulerAnglesXYZ(math.rad(d.rx),math.rad(d.ry),math.rad(d.rz))
-	local pivot=Instance.new("Part")
-	pivot.Name="FAPivot"
-	pivot.Size=Vector3.new(0.2,0.2,0.2)
-	pivot.Transparency=1
-	pivot.CanCollide=false
-	pivot.CanTouch=false
-	pivot.CanQuery=false
-	pivot.Massless=true
-	pivot.Anchored=false
-	pivot.CFrame=target.CFrame*base
-	local lv={base=base,parts={},pivot=pivot}
-	local items={pivot}
-	for i,p in ipairs(d.parts) do
-		local o=newPart(p,false)
-		local cf=partCF(p)
-		o.CFrame=pivot.CFrame*cf
-		local w=Instance.new("Weld")
-		w.Part0=pivot
-		w.Part1=o
-		w.C0=cf
-		w.Parent=o
-		lv.parts[i]={o=o,w=w}
-		items[#items+1]=o
-	end
-	local w=Instance.new("Weld")
-	w.Part0=target
-	w.Part1=pivot
-	w.C0=base
-	w.Parent=pivot
-	lv.w=w
-	for _,o in ipairs(items) do o.Parent=folder end
-	return lv
+    local target=char:FindFirstChild(d.attach,true)
+    if d.attach=="Free" or not (target and target:IsA("BasePart")) then target=char:FindFirstChild("HumanoidRootPart") end
+    local base=CFrame.new(d.px,d.py,d.pz)*CFrame.fromEulerAnglesXYZ(math.rad(d.rx),math.rad(d.ry),math.rad(d.rz))
+    local pivot=Instance.new("Part")
+    pivot.Name="FAPivot"; pivot.Size=Vector3.new(0.2,0.2,0.2); pivot.Transparency=1
+    pivot.CanCollide=false; pivot.CanTouch=false; pivot.CanQuery=false; pivot.Massless=true
+    pivot.Anchored=false; pivot.CFrame=target.CFrame*base
+    local lv={base=base,parts={},pivot=pivot}
+    local items={pivot}
+    for i,p in ipairs(d.parts) do
+        local o=newPart(p,false); local cf=partCF(p); o.CFrame=pivot.CFrame*cf
+        local w=Instance.new("Weld"); w.Part0=pivot; w.Part1=o; w.C0=cf; w.Parent=o
+        lv.parts[i]={o=o,w=w}; items[#items+1]=o
+    end
+    local w=Instance.new("Weld"); w.Part0=target; w.Part1=pivot; w.C0=base; w.Parent=pivot
+    lv.w=w
+    for _,o in ipairs(items) do o.Parent=folder end
+    return lv
 end
-local function fxA(p)
-	return CFrame.new(p.ax,p.ay,p.az)*CFrame.fromEulerAnglesXYZ(math.rad(p.arx),math.rad(p.ary),math.rad(p.arz))
-end
-local function fxB(p)
-	return CFrame.new(p.bx,p.by,p.bz)*CFrame.fromEulerAnglesXYZ(math.rad(p.brx),math.rad(p.bry),math.rad(p.brz))
-end
+local function fxA(p) return CFrame.new(p.ax,p.ay,p.az)*CFrame.fromEulerAnglesXYZ(math.rad(p.arx),math.rad(p.ary),math.rad(p.arz)) end
+local function fxB(p) return CFrame.new(p.bx,p.by,p.bz)*CFrame.fromEulerAnglesXYZ(math.rad(p.brx),math.rad(p.bry),math.rad(p.brz)) end
 local function groundAt(pos,ignore)
-	local params=RaycastParams.new()
-	params.FilterType=Enum.RaycastFilterType.Exclude
-	params.FilterDescendantsInstances=ignore
-	local r=workspace:Raycast(pos+Vector3.new(0,8,0),Vector3.new(0,-120,0),params)
-	if r then return r.Position end
-	return pos
+    local params=RaycastParams.new()
+    params.FilterType=Enum.RaycastFilterType.Exclude
+    params.FilterDescendantsInstances=ignore
+    local r=workspace:Raycast(pos+Vector3.new(0,8,0),Vector3.new(0,-120,0),params)
+    return r and r.Position or pos
 end
 local function fxOrigin(f,char,live,fxFolder)
-	local root=char:FindFirstChild("HumanoidRootPart")
-	if not root then return nil end
-	local frame=root.CFrame
-	local lv=f.mode=="Prop" and f.follow and live["P:"..f.follow]
-	if lv then frame=lv.w.Part0.CFrame*lv.w.C0 end
-	local pos=(frame*CFrame.new(f.ox,f.oy,f.oz)).Position
-	if f.ground then
-		pos=groundAt(pos,{char,fxFolder})+Vector3.new(0,f.lift,0)
-	end
-	local _,yaw=root.CFrame:ToEulerAnglesYXZ()
-	return CFrame.new(pos)*CFrame.Angles(0,yaw,0)
+    local root=char:FindFirstChild("HumanoidRootPart"); if not root then return nil end
+    local frame=root.CFrame
+    local lv=f.mode=="Prop" and f.follow and live["P:"..f.follow]
+    if lv then frame=lv.w.Part0.CFrame*lv.w.C0 end
+    local pos=(frame*CFrame.new(f.ox,f.oy,f.oz)).Position
+    if f.ground then pos=groundAt(pos,{char,fxFolder,lp.Character})+Vector3.new(0,f.lift,0) end
+    local _,yaw=root.CFrame:ToEulerAnglesYXZ()
+    return CFrame.new(pos)*CFrame.Angles(0,yaw,0)
 end
 local function spawnFx(f,char,live,fxFolder,active)
-	if #f.parts==0 then return end
-	local o=fxOrigin(f,char,live,fxFolder)
-	if not o then return end
-	local es,ed=Enum.EasingStyle.Quad,Enum.EasingDirection.Out
-	pcall(function()
-		es=Enum.EasingStyle[f.ease]
-		ed=Enum.EasingDirection[f.dir]
-	end)
-	local inst={f=f,o=o,age=0,es=es,ed=ed,items={},maxdl=0}
-	for i,p in ipairs(f.parts) do
-		if i>80 then break end
-		local part=newPart(p,true)
-		local a=fxA(p)
-		part.CFrame=o*a
-		part.Transparency=1
-		part.Parent=fxFolder
-		local dl=p.dl or 0
-		if dl>inst.maxdl then inst.maxdl=dl end
-		inst.items[#inst.items+1]={part=part,a=a,b=fxB(p),dl=dl,tr=p.tr or 0}
-	end
-	inst.total=inst.maxdl+f.dur+f.hold+f.fade
-	active[#active+1]=inst
-	while #active>40 do
-		local old=table.remove(active,1)
-		for _,it in ipairs(old.items) do pcall(function() it.part:Destroy() end) end
-	end
+    if #f.parts==0 then return end
+    local o=fxOrigin(f,char,live,fxFolder); if not o then return end
+    local es,ed=Enum.EasingStyle.Quad,Enum.EasingDirection.Out
+    pcall(function() es=Enum.EasingStyle[f.ease]; ed=Enum.EasingDirection[f.dir] end)
+    local inst={f=f,o=o,age=0,es=es,ed=ed,items={},maxdl=0}
+    for i,p in ipairs(f.parts) do
+        if i>80 then break end
+        local part=newPart(p,true); local a=fxA(p); part.CFrame=o*a; part.Transparency=1; part.Parent=fxFolder
+        local dl=p.dl or 0; if dl>inst.maxdl then inst.maxdl=dl end
+        inst.items[#inst.items+1]={part=part,a=a,b=fxB(p),dl=dl,tr=p.tr or 0}
+    end
+    inst.total=inst.maxdl+f.dur+f.hold+f.fade
+    active[#active+1]=inst
+    while #active>40 do
+        local old=table.remove(active,1)
+        for _,it in ipairs(old.items) do pcall(function() it.part:Destroy() end) end
+    end
 end
 local function stepFx(active,dt)
-	for i=#active,1,-1 do
-		local inst=active[i]
-		local f=inst.f
-		inst.age=inst.age+dt
-		local age=inst.age
-		if age>=inst.total then
-			for _,it in ipairs(inst.items) do pcall(function() it.part:Destroy() end) end
-			table.remove(active,i)
-		else
-			for _,it in ipairs(inst.items) do
-				pcall(function()
-					local pa=age-it.dl
-					if pa<0 then
-						it.part.Transparency=1
-					else
-						local a=f.dur>0 and math.clamp(pa/f.dur,0,1) or 1
-						local e=TweenService:GetValue(a,inst.es,inst.ed)
-						local fs=f.dur+f.hold
-						local fa=0
-						if pa>fs then fa=f.fade>0 and math.clamp((pa-fs)/f.fade,0,1) or 1 end
-						it.part.CFrame=inst.o*it.a:Lerp(it.b,e)
-						it.part.Transparency=it.tr+(1-it.tr)*fa
-					end
-				end)
-			end
-		end
-	end
+    for i=#active,1,-1 do
+        local inst=active[i]; local f=inst.f; inst.age=inst.age+dt; local age=inst.age
+        if age>=inst.total then
+            for _,it in ipairs(inst.items) do pcall(function() it.part:Destroy() end) end
+            table.remove(active,i)
+        else
+            for _,it in ipairs(inst.items) do
+                pcall(function()
+                    local pa=age-it.dl
+                    if pa<0 then it.part.Transparency=1
+                    else
+                        local a=f.dur>0 and math.clamp(pa/f.dur,0,1) or 1
+                        local e=TweenService:GetValue(a,inst.es,inst.ed)
+                        local fs=f.dur+f.hold
+                        local fa=0
+                        if pa>fs then fa=f.fade>0 and math.clamp((pa-fs)/f.fade,0,1) or 1 end
+                        it.part.CFrame=inst.o*it.a:Lerp(it.b,e)
+                        it.part.Transparency=it.tr+(1-it.tr)*fa
+                    end
+                end)
+            end
+        end
+    end
 end
 local function clearFx(active)
-	for i=#active,1,-1 do
-		for _,it in ipairs(active[i].items) do pcall(function() it.part:Destroy() end) end
-		table.remove(active,i)
-	end
+    for i=#active,1,-1 do
+        for _,it in ipairs(active[i].items) do pcall(function() it.part:Destroy() end) end
+        table.remove(active,i)
+    end
 end
 local function crossed(prev,cur,wrapped,ft)
-	if wrapped then return ft>prev or ft<=cur end
-	return ft>prev and ft<=cur
+    if wrapped then return ft>prev or ft<=cur end
+    return ft>prev and ft<=cur
 end
+
+-- ================= SQUASH (R6 + R15) =================
+local function SquashPlayer(char)
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    -- disable animator so it can't fight us
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if hum then
+        local anim = hum:FindFirstChildOfClass("Animator")
+        if anim then
+            for _,tr in ipairs(anim:GetPlayingAnimationTracks()) do
+                pcall(function() tr:AdjustSpeed(0) end)
+            end
+        end
+    end
+    -- find ground
+    local params=RaycastParams.new()
+    params.FilterType=Enum.RaycastFilterType.Exclude
+    params.FilterDescendantsInstances={char}
+    local ray=workspace:Raycast(root.Position,Vector3.new(0,-30,0),params)
+    local groundY = ray and ray.Position.Y or (root.Position.Y - 3)
+    -- disable Motor6D so anchored CFrames are the final word
+    for _,d in ipairs(char:GetDescendants()) do
+        if d:IsA("Motor6D") then pcall(function() d:Destroy() end) end
+    end
+    -- squash every part
+    for _,d in ipairs(char:GetDescendants()) do
+        if d:IsA("BasePart") and d.Name ~= "HumanoidRootPart" then
+            local oldCF = d.CFrame
+            local oldSize = d.Size
+            local rot = oldCF - oldCF.Position
+            d.Anchored = true
+            d.CanCollide = false
+            local newSize = Vector3.new(
+                math.max(oldSize.X * 1.7, 0.1),
+                math.max(oldSize.Y * 0.15, 0.05),
+                math.max(oldSize.Z * 1.7, 0.1)
+            )
+            d.Size = newSize
+            local y = groundY + newSize.Y/2 + 0.03
+            d.CFrame = CFrame.new(oldCF.Position.X, y, oldCF.Position.Z) * rot
+        end
+    end
+end
+
+-- ================= BLOOD (red squares, gravity, imperfect circle) =================
+local function SpawnBlood(center)
+    local folder=Instance.new("Folder"); folder.Name="BloodFX"; folder.Parent=workspace
+    local count=26
+    for i=1,count do
+        local p=Instance.new("Part")
+        p.Name="Blood"
+        p.Size=Vector3.new(0.35,0.35,0.35)
+        p.Color=Color3.fromRGB(150,8,8)
+        p.Material=Enum.Material.SmoothPlastic
+        p.CanCollide=false; p.CanTouch=false; p.CanQuery=false
+        p.Anchored=false; p.Massless=true
+        local baseAngle=(i/count)*math.pi*2
+        local angle=baseAngle+(math.random()-0.5)*0.7           -- imperfect circle
+        local radius=1.2+math.random()*2.8                       -- varied radius
+        local px=center.X+math.cos(angle)*radius
+        local pz=center.Z+math.sin(angle)*radius
+        local py=center.Y-1.4+math.random()*0.3                  -- start near ground
+        p.CFrame=CFrame.new(px,py,pz)*CFrame.Angles(
+            math.random()*math.pi*2, math.random()*math.pi*2, math.random()*math.pi*2)
+        p.Parent=folder
+        -- push up + outward (gravity handles the rest)
+        local upV=5+math.random()*8
+        local outV=radius*0.8
+        p.AssemblyLinearVelocity=Vector3.new(math.cos(angle)*outV,upV,math.sin(angle)*outV)
+        p.AssemblyAngularVelocity=Vector3.new(
+            (math.random()-0.5)*20,(math.random()-0.5)*20,(math.random()-0.5)*20)
+        -- fade out shortly after 0.23s
+        task.delay(BLOOD_WAIT, function()
+            if p and p.Parent then
+                pcall(function()
+                    TweenService:Create(p,TweenInfo.new(0.15),{Transparency=1}):Play()
+                end)
+                task.wait(0.18)
+                pcall(function() if p and p.Parent then p:Destroy() end end)
+            end
+        end)
+    end
+    task.delay(2, function() pcall(function() folder:Destroy() end) end)
+end
+
+-- Build tracks
 local tracks={}
 for name,keys in pairs(DATA) do
-	local list={}
-	for _,k in ipairs(keys) do
-		local es,ed=Enum.EasingStyle.Linear,Enum.EasingDirection.InOut
-		pcall(function()
-			es=Enum.EasingStyle[k[8]]
-			ed=Enum.EasingDirection[k[9]]
-		end)
-		list[#list+1]={t=k[1],cf=CFrame.new(k[2],k[3],k[4])*CFrame.fromEulerAnglesXYZ(math.rad(k[5]),math.rad(k[6]),math.rad(k[7])),es=es,ed=ed}
-	end
-	table.sort(list,function(a,b) return a.t<b.t end)
-	tracks[name]=list
+    local list={}
+    for _,k in ipairs(keys) do
+        local es,ed=Enum.EasingStyle.Linear,Enum.EasingDirection.InOut
+        pcall(function() es=Enum.EasingStyle[k[8]]; ed=Enum.EasingDirection[k[9]] end)
+        list[#list+1]={t=k[1],cf=CFrame.new(k[2],k[3],k[4])*CFrame.fromEulerAnglesXYZ(math.rad(k[5]),math.rad(k[6]),math.rad(k[7])),es=es,ed=ed}
+    end
+    table.sort(list,function(a,b) return a.t<b.t end)
+    tracks[name]=list
 end
 local function sample(list,t)
-	local n=#list
-	if t<=list[1].t then return list[1].cf end
-	if t>=list[n].t then return list[n].cf end
-	for i=2,n do
-		local b=list[i]
-		if t<=b.t then
-			local a=list[i-1]
-			local span=b.t-a.t
-			local alpha=span>0 and (t-a.t)/span or 1
-			return a.cf:Lerp(b.cf,TweenService:GetValue(alpha,b.es,b.ed))
-		end
-	end
-	return list[n].cf
+    local n=#list
+    if t<=list[1].t then return list[1].cf end
+    if t>=list[n].t then return list[n].cf end
+    for i=2,n do
+        local b=list[i]
+        if t<=b.t then
+            local a=list[i-1]; local span=b.t-a.t
+            local alpha=span>0 and (t-a.t)/span or 1
+            return a.cf:Lerp(b.cf,TweenService:GetValue(alpha,b.es,b.ed))
+        end
+    end
+    return list[n].cf
 end
 
-local function startAnimation()
-	if env.__FakeAnimStop then pcall(env.__FakeAnimStop) end
-	local fxFolder=Instance.new("Folder")
-	fxFolder.Name="FakeAnimFX"
-	fxFolder.Parent=workspace
-	local active={}
-	local char=nil
-	local motors={}
-	local origs={}
-	local live={}
-	local folder=nil
-	local elapsed=0
-	local prevT=-1
-	local ending=false
-	local conn
-	local stopFn
-	local function restoreAll()
-		for m,c in pairs(origs) do
-			pcall(function() m.C0=c end)
-		end
-		live={}
-		if folder then
-			pcall(function() folder:Destroy() end)
-			folder=nil
-		end
-	end
-	local function fullCleanup()
-		restoreAll()
-		clearFx(active)
-		pcall(function() fxFolder:Destroy() end)
-	end
-	local function bind(c)
-		restoreAll()
-		char=c
-		motors={}
-		origs={}
-		for _,d in ipairs(c:GetDescendants()) do
-			if d:IsA("Motor6D") and tracks[d.Name] and not motors[d.Name] then
-				motors[d.Name]=d
-				origs[d]=d.C0
-			end
-		end
-		folder=Instance.new("Folder")
-		folder.Name="FakeAnimProps"
-		folder.Parent=c
-		for _,d in ipairs(PROPS) do
-			pcall(function() live["P:"..d.name]=buildPropLive(d,c,folder) end)
-		end
-		elapsed=0
-		prevT=-1
-	end
-	conn=RunService.RenderStepped:Connect(function(dt)
-		dt=dt*2
-		stepFx(active,dt)
-		if ending then
-			if #active==0 then
-				conn:Disconnect()
-				fullCleanup()
-				if env.__FakeAnimStop==stopFn then env.__FakeAnimStop=nil end
-			end
-			return
-		end
-		local c=player.Character
-		if not c then return end
-		if c~=char then
-			if not (c:FindFirstChildOfClass("Humanoid") and c:FindFirstChild("HumanoidRootPart")) then return end
-			bind(c)
-		end
-		elapsed=elapsed+dt
-		local t=elapsed
-		local finished=false
-		if LOOP then
-			t=LENGTH>0 and elapsed%LENGTH or 0
-		elseif elapsed>=LENGTH then
-			t=LENGTH
-			finished=true
-		end
-		for name,m in pairs(motors) do
-			local list=tracks[name]
-			if m.Parent and list and #list>0 then
-				pcall(function() m.C0=origs[m]*sample(list,t) end)
-			end
-		end
-		for key,v in pairs(live) do
-			local list=tracks[key]
-			pcall(function()
-				if list and #list>0 then
-					v.w.C0=v.base*sample(list,t)
-				else
-					v.w.C0=v.base
-				end
-			end)
-		end
-		local wrapped=t<prevT
-		for _,f in ipairs(FXS) do
-			if crossed(prevT,t,wrapped,f.t) then pcall(spawnFx,f,char,live,fxFolder,active) end
-		end
-		prevT=t
-		if finished then
-			restoreAll()
-			ending=true
-		end
-	end)
-	stopFn=function()
-		pcall(function() conn:Disconnect() end)
-		fullCleanup()
-	end
-	env.__FakeAnimStop=stopFn
+local function startAnimation(model, onCrack)
+    local fxFolder=Instance.new("Folder"); fxFolder.Name="FakeAnimFX"; fxFolder.Parent=workspace
+    local active={}; local motors={}; local origs={}; local live={}
+    local folder=nil; local elapsed=0; local prevT=-1
+    local ending=false; local freezing=false; local fired=false
+    local conn
+    local function fullCleanup()
+        for m,c in pairs(origs) do pcall(function() m.C0=c end) end
+        live={}
+        if folder then pcall(function() folder:Destroy() end); folder=nil end
+        clearFx(active); pcall(function() fxFolder:Destroy() end)
+    end
+    for _,d in ipairs(model:GetDescendants()) do
+        if d:IsA("Motor6D") and tracks[d.Name] and not motors[d.Name] then
+            motors[d.Name]=d; origs[d]=d.C0
+        end
+    end
+    folder=Instance.new("Folder"); folder.Name="FakeAnimProps"; folder.Parent=model
+    for _,d in ipairs(PROPS) do
+        pcall(function() live["P:"..d.name]=buildPropLive(d,model,folder) end)
+    end
+    local function snapToCrack(tSnap)
+        for name,m in pairs(motors) do
+            local list=tracks[name]
+            if m.Parent and list and #list>0 then
+                pcall(function() m.C0=origs[m]*sample(list,tSnap) end)
+            end
+        end
+        for key,v in pairs(live) do
+            local list=tracks[key]
+            pcall(function()
+                if list and #list>0 then v.w.C0=v.base*sample(list,tSnap)
+                else v.w.C0=v.base end
+            end)
+        end
+    end
+    conn=RunService.RenderStepped:Connect(function(dt)
+        dt=dt*SPEED
+        stepFx(active,dt)
+        if freezing then
+            if #active==0 then conn:Disconnect() end
+            return
+        end
+        if ending then
+            if #active==0 then conn:Disconnect(); fullCleanup() end
+            return
+        end
+        elapsed=elapsed+dt
+        local t=elapsed
+        local finished=false
+        if LOOP then t=LENGTH>0 and elapsed%LENGTH or 0
+        elseif elapsed>=LENGTH then t=LENGTH; finished=true end
+        for name,m in pairs(motors) do
+            local list=tracks[name]
+            if m.Parent and list and #list>0 then
+                pcall(function() m.C0=origs[m]*sample(list,t) end)
+            end
+        end
+        for key,v in pairs(live) do
+            local list=tracks[key]
+            pcall(function()
+                if list and #list>0 then v.w.C0=v.base*sample(list,t)
+                else v.w.C0=v.base end
+            end)
+        end
+        local wrapped=t<prevT
+        for _,f in ipairs(FXS) do
+            if crossed(prevT,t,wrapped,f.t) then
+                pcall(spawnFx,f,model,live,fxFolder,active)
+                if not fired and f.name=="hh" then
+                    fired=true
+                    snapToCrack(f.t)       -- freeze dummy at crack
+                    freezing=true
+                    prevT=t
+                    if onCrack then task.spawn(onCrack) end
+                    return
+                end
+            end
+        end
+        prevT=t
+        if finished then
+            for m,c in pairs(origs) do pcall(function() m.C0=c end) end
+            live={}
+            if folder then pcall(function() folder:Destroy() end); folder=nil end
+            ending=true
+        end
+    end)
+    return function()
+        pcall(function() conn:Disconnect() end)
+        fullCleanup()
+    end
 end
 
-local gui=Instance.new("ScreenGui")
-gui.Name="FakeAnimButtonGui"
-gui.ResetOnSpawn=false
-gui.IgnoreGuiInset=true
-local okGui=pcall(function() gui.Parent=game:GetService("CoreGui") end)
-if not okGui or not gui.Parent then
-	gui.Parent=player:WaitForChild("PlayerGui")
-end
-env.__FakeAnimGui=gui
-
+-- GUI
+local gui=Instance.new("ScreenGui"); gui.Name="BanSceneGui"; gui.ResetOnSpawn=false; gui.IgnoreGuiInset=true
+attach(gui)
 local button=Instance.new("TextButton")
-button.Name="PlayButton"
+button.Name="StartButton"
 button.AnchorPoint=Vector2.new(0.5,1)
 button.Position=UDim2.new(0.5,0,1,-90)
 button.Size=UDim2.new(0,150,0,48)
 button.BackgroundColor3=Color3.fromRGB(35,35,40)
 button.BorderSizePixel=0
-button.Text="Play Animation"
+button.Text="Ban Hammer"
 button.TextColor3=Color3.fromRGB(255,255,255)
 button.TextSize=18
 button.Font=Enum.Font.GothamBold
-button.AutoButtonColor=true
 button.Parent=gui
+local corner=Instance.new("UICorner"); corner.CornerRadius=UDim.new(0,12); corner.Parent=button
+local stroke=Instance.new("UIStroke"); stroke.Color=Color3.fromRGB(90,200,120); stroke.Thickness=2; stroke.Parent=button
 
-local corner=Instance.new("UICorner")
-corner.CornerRadius=UDim.new(0,12)
-corner.Parent=button
+local currentCleanup=nil
+local running=false
+local kicked=false
 
-local stroke=Instance.new("UIStroke")
-stroke.Color=Color3.fromRGB(90,200,120)
-stroke.Thickness=2
-stroke.Parent=button
+local function Run()
+    if running then return end
+    running=true; currentCleanup=nil; button.Visible=false; kicked=false
+    local char=lp.Character
+    local root=char and char:FindFirstChild("HumanoidRootPart")
+    local hum=char and char:FindFirstChildOfClass("Humanoid")
+    if not root or not hum then running=false; button.Visible=true; return end
+    local model=nil; local stopAnim=nil; local controls=nil; local saved=nil
+    local function cleanup()
+        if kicked then return end
+        if stopAnim then pcall(stopAnim) end
+        if model then pcall(function() model:Destroy() end) end
+        if saved then
+            set(root,"Anchored",saved.an)
+            set(hum,"WalkSpeed",saved.ws)
+            set(hum,"JumpPower",saved.jp)
+            set(hum,"JumpHeight",saved.jh)
+            set(hum,"AutoRotate",saved.ar)
+        end
+        if controls then pcall(function() controls:Enable() end) end
+        stopAnim=nil; model=nil; saved=nil; controls=nil
+        running=false; button.Visible=true
+    end
+    currentCleanup=cleanup
+    model=BuildModel()
+    if not model then cleanup(); return end
+    local mroot=model:FindFirstChild("HumanoidRootPart")
+    if not mroot then cleanup(); return end
+    model.Name=Data.Name; mroot.Anchored=true; model.Parent=workspace
+    local cam=workspace.CurrentCamera
+    local dir=Vector3.new(cam.CFrame.LookVector.X,0,cam.CFrame.LookVector.Z)
+    if dir.Magnitude<0.1 then local lv=root.CFrame.LookVector; dir=Vector3.new(lv.X,0,lv.Z) end
+    if dir.Magnitude<0.01 then dir=Vector3.new(0,0,-1) end
+    dir=dir.Unit
+    local base=root.Position
+    local cpos=base+dir*DISTANCE
+    model:PivotTo(CFrame.lookAt(cpos,Vector3.new(base.X,cpos.Y,base.Z)))
+    local bc,bs=model:GetBoundingBox()
+    local gp=rayGround(cpos,{char,model})
+    if gp then
+        local bottom=bc.Position.Y-bs.Y/2
+        model:PivotTo(model:GetPivot()+Vector3.new(0,gp.Y-bottom,0))
+    end
+    saved={ws=hum.WalkSpeed,jp=hum.JumpPower,jh=hum.JumpHeight,ar=hum.AutoRotate,an=root.Anchored}
+    set(hum,"WalkSpeed",0); set(hum,"JumpPower",0); set(hum,"JumpHeight",0); set(hum,"AutoRotate",false)
+    set(root,"AssemblyLinearVelocity",Vector3.zero)
+    set(root,"CFrame",CFrame.lookAt(root.Position,Vector3.new(cpos.X,root.Position.Y,cpos.Z)))
+    set(root,"Anchored",true)
+    pcall(function()
+        controls=require(lp.PlayerScripts:FindFirstChild("PlayerModule")):GetControls()
+        controls:Disable()
+    end)
 
-button.MouseButton1Click:Connect(startAnimation)
+    stopAnim=startAnimation(model, function()
+        -- ===== CRACK MOMENT =====
+        -- 1) freezes player anim at last frame + squash (R6/R15)
+        pcall(function() SquashPlayer(char) end)
+        -- 2) blood right on the ground under the player
+        local proot = char and char:FindFirstChild("HumanoidRootPart")
+        local bloodPos = proot and proot.Position or (root and root.Position) or Vector3.zero
+        pcall(function() SpawnBlood(bloodPos) end)
+        -- 3) wait for blood, then real kick
+        task.wait(BLOOD_WAIT)
+        kicked = true
+        local ok=pcall(function() lp:Kick(KICK_REASON) end)
+        if not ok then pcall(function() game.Players.LocalPlayer:Kick(KICK_REASON) end) end
+    end)
+end
+local function runSafe()
+    local ok=pcall(Run)
+    if not ok then
+        if currentCleanup then pcall(currentCleanup) end
+        running=false; button.Visible=true
+    end
+end
+button.MouseButton1Click:Connect(function() task.spawn(runSafe) end)
+env.__BanSceneCleanup=function()
+    kicked=false
+    if currentCleanup then pcall(currentCleanup) end
+    pcall(function() gui:Destroy() end)
+end
