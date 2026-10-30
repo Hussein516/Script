@@ -1,0 +1,513 @@
+local Players    = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui   = LocalPlayer:WaitForChild("PlayerGui")
+
+local RENDER_NAME      = "ClosestPlayerVisual"
+local BACK_OFFSET      = CFrame.new(0, 0, 6)
+local NECK_SEAT_ADJUST = 0.3
+local SIT_YAW          = math.pi
+local UNDER_GAP        = 0.25
+local SLAM_START       = 40
+local SLAM_STEP        = 5
+local SLAM_VELOCITY    = 400
+local EXIT_DISTANCE    = 10
+local BUMP_FAR         = 6
+local BUMP_NEAR        = 1
+local SITBUMP_FAR      = 6
+local SITBUMP_NEAR     = 0
+local BUMP_PERIOD      = 0.3
+local BUMP_VELOCITY    = 120
+local MODE_NAMES       = {"Normal", "Head", "Under", "Bump", "Sit Bump"}
+local FLAT             = CFrame.Angles(-math.rad(90), 0, 0)
+local SIT_ROT          = CFrame.Angles(0, SIT_YAW, 0)
+
+local activeMode = nil
+local slamActive = false
+local slamHeight = 0
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "ClosestPlayerGui"
+screenGui.ResetOnSpawn = false
+screenGui.IgnoreGuiInset = true
+screenGui.Parent = PlayerGui
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 230, 0, 330)
+mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = screenGui
+
+local function makeRound(parent, radius)
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, radius)
+    c.Parent = parent
+end
+
+makeRound(mainFrame, 8)
+
+local padding = Instance.new("UIPadding")
+padding.PaddingTop = UDim.new(0, 6)
+padding.PaddingBottom = UDim.new(0, 6)
+padding.PaddingLeft = UDim.new(0, 10)
+padding.PaddingRight = UDim.new(0, 10)
+padding.Parent = mainFrame
+
+local layout = Instance.new("UIListLayout")
+layout.Padding = UDim.new(0, 4)
+layout.SortOrder = Enum.SortOrder.LayoutOrder
+layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+layout.Parent = mainFrame
+
+local order = 0
+local function nextOrder()
+    order = order + 1
+    return order
+end
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 26)
+title.BackgroundTransparency = 1
+title.Text = "Closest Player"
+title.TextScaled = true
+title.Font = Enum.Font.GothamBold
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.LayoutOrder = nextOrder()
+title.Parent = mainFrame
+
+local nameBox = Instance.new("TextBox")
+nameBox.Size = UDim2.new(1, 0, 0, 30)
+nameBox.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+nameBox.BorderSizePixel = 0
+nameBox.PlaceholderText = "Player name (empty = closest)"
+nameBox.PlaceholderColor3 = Color3.fromRGB(140, 140, 140)
+nameBox.Text = ""
+nameBox.ClearTextOnFocus = false
+nameBox.TextScaled = true
+nameBox.Font = Enum.Font.Gotham
+nameBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+nameBox.LayoutOrder = nextOrder()
+nameBox.Parent = mainFrame
+makeRound(nameBox, 6)
+
+local OFF_COLOR = Color3.fromRGB(70, 70, 70)
+local ON_COLOR  = Color3.fromRGB(60, 160, 90)
+
+local modeButtons = {}
+for i, name in ipairs(MODE_NAMES) do
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(1, 0, 0, 30)
+    button.BackgroundColor3 = OFF_COLOR
+    button.BorderSizePixel = 0
+    button.Text = name .. ": OFF"
+    button.TextScaled = true
+    button.Font = Enum.Font.Gotham
+    button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    button.LayoutOrder = nextOrder()
+    button.Parent = mainFrame
+    makeRound(button, 6)
+    modeButtons[i] = button
+end
+
+local slamButton = Instance.new("TextButton")
+slamButton.Size = UDim2.new(1, 0, 0, 30)
+slamButton.BackgroundColor3 = Color3.fromRGB(170, 90, 40)
+slamButton.BorderSizePixel = 0
+slamButton.Text = "Slam"
+slamButton.TextScaled = true
+slamButton.Font = Enum.Font.Gotham
+slamButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+slamButton.LayoutOrder = nextOrder()
+slamButton.Parent = mainFrame
+makeRound(slamButton, 6)
+
+local status = Instance.new("TextLabel")
+status.Size = UDim2.new(1, 0, 0, 22)
+status.BackgroundTransparency = 1
+status.Text = "Idle"
+status.TextScaled = true
+status.Font = Enum.Font.Gotham
+status.TextColor3 = Color3.fromRGB(200, 200, 200)
+status.LayoutOrder = nextOrder()
+status.Parent = mainFrame
+
+local function updateButtons()
+    for i, button in ipairs(modeButtons) do
+        local on = activeMode == i
+        button.Text = MODE_NAMES[i] .. ": " .. (on and "ON" or "OFF")
+        button.BackgroundColor3 = on and ON_COLOR or OFF_COLOR
+    end
+end
+
+local function getMyRoot()
+    local character = LocalPlayer.Character
+    return character and character:FindFirstChild("HumanoidRootPart") or nil
+end
+
+local function getMyHumanoid()
+    local character = LocalPlayer.Character
+    return character and character:FindFirstChildOfClass("Humanoid") or nil
+end
+
+local function getRoot(player)
+    local character = player.Character
+    return character and character:FindFirstChild("HumanoidRootPart") or nil
+end
+
+local function zeroVelocity(root)
+    if root then
+        root.AssemblyLinearVelocity = Vector3.zero
+        root.AssemblyAngularVelocity = Vector3.zero
+    end
+end
+
+local function getClosestPlayer()
+    local myRoot = getMyRoot()
+    if not myRoot then return nil, nil end
+
+    local closestPlayer = nil
+    local closestRoot   = nil
+    local shortest      = math.huge
+
+    for _, otherPlayer in ipairs(Players:GetPlayers()) do
+        if otherPlayer ~= LocalPlayer then
+            local otherRoot = getRoot(otherPlayer)
+            if otherRoot then
+                local distance = (myRoot.Position - otherRoot.Position).Magnitude
+                if distance < shortest then
+                    shortest      = distance
+                    closestPlayer = otherPlayer
+                    closestRoot   = otherRoot
+                end
+            end
+        end
+    end
+
+    return closestPlayer, closestRoot
+end
+
+local function scoreMatch(query, text)
+    text = string.lower(text)
+    if text == query then
+        return 1, 0
+    end
+    if string.sub(text, 1, #query) == query then
+        return 2, #text - #query
+    end
+    if string.find(text, query, 1, true) then
+        return 3, #text - #query
+    end
+    return nil, nil
+end
+
+local function findPlayerByQuery(rawQuery)
+    local query = string.lower((string.gsub(rawQuery, "%s+", "")))
+    if query == "" then return nil end
+
+    local bestPlayer = nil
+    local bestScore  = math.huge
+    local bestExtra  = math.huge
+
+    for _, otherPlayer in ipairs(Players:GetPlayers()) do
+        if otherPlayer ~= LocalPlayer then
+            local s1, e1 = scoreMatch(query, otherPlayer.Name)
+            local s2, e2 = scoreMatch(query, otherPlayer.DisplayName)
+            local score, extra = nil, nil
+
+            if s1 and s2 then
+                if s1 < s2 or (s1 == s2 and e1 <= e2) then
+                    score, extra = s1, e1
+                else
+                    score, extra = s2, e2
+                end
+            elseif s1 then
+                score, extra = s1, e1
+            elseif s2 then
+                score, extra = s2, e2
+            end
+
+            if score and (score < bestScore or (score == bestScore and extra < bestExtra)) then
+                bestPlayer = otherPlayer
+                bestScore  = score
+                bestExtra  = extra
+            end
+        end
+    end
+
+    return bestPlayer
+end
+
+local function resolveTarget()
+    local query = nameBox.Text
+    if string.gsub(query, "%s+", "") == "" then
+        return getClosestPlayer()
+    end
+
+    local player = findPlayerByQuery(query)
+    if not player then return nil, nil, true end
+
+    local root = getRoot(player)
+    if not root then return nil, nil end
+
+    return player, root
+end
+
+local function getTorso(character)
+    return character:FindFirstChild("UpperTorso") or character:FindFirstChild("Torso")
+end
+
+local function getSeatDrop(myRoot)
+    local character = LocalPlayer.Character
+    local lower = character and (character:FindFirstChild("LowerTorso") or character:FindFirstChild("Torso"))
+    if not lower then return 1 end
+    local rel = myRoot.CFrame:PointToObjectSpace(lower.Position)
+    return -rel.Y + lower.Size.Y / 2
+end
+
+local function getNeckHeight(targetPlayer, targetRoot)
+    local character = targetPlayer.Character
+    local torso = character and getTorso(character)
+    if torso then
+        local topWorld = torso.Position + Vector3.new(0, torso.Size.Y / 2, 0)
+        return targetRoot.CFrame:PointToObjectSpace(topWorld).Y
+    end
+    return 1.5
+end
+
+local function getNeckSeatY(targetPlayer, targetRoot, myRoot)
+    return getNeckHeight(targetPlayer, targetRoot) + getSeatDrop(myRoot) + NECK_SEAT_ADJUST
+end
+
+local function getFeetDistance(targetPlayer, targetRoot)
+    local character = targetPlayer.Character
+    if not character then return targetRoot.Size.Y / 2 + 2 end
+
+    local rootCFrame = targetRoot.CFrame
+    local lowest = nil
+
+    for _, part in ipairs(character:GetChildren()) do
+        if part:IsA("BasePart") then
+            local rel = rootCFrame:ToObjectSpace(part.CFrame)
+            local s = part.Size
+            local extent = (
+                math.abs(rel.RightVector.Y) * s.X +
+                math.abs(rel.UpVector.Y) * s.Y +
+                math.abs(rel.LookVector.Y) * s.Z
+            ) / 2
+            local bottom = rel.Position.Y - extent
+            if lowest == nil or bottom < lowest then
+                lowest = bottom
+            end
+        end
+    end
+
+    if lowest == nil then return targetRoot.Size.Y / 2 + 2 end
+    return -lowest
+end
+
+local function getUnderY(targetPlayer, targetRoot, myRoot)
+    local feet = getFeetDistance(targetPlayer, targetRoot)
+    local thickness = myRoot.Size.Z / 2
+    return -(feet + thickness + UNDER_GAP)
+end
+
+local function wavePhase()
+    return (os.clock() % BUMP_PERIOD) / BUMP_PERIOD
+end
+
+local function waveZ(far, near)
+    local t = wavePhase()
+    local k = t < 0.5 and t * 2 or (1 - t) * 2
+    return near + (far - near) * k
+end
+
+local function isApproaching()
+    return wavePhase() >= 0.5
+end
+
+local function computeOffset(targetPlayer, targetRoot, myRoot)
+    if slamActive then
+        return CFrame.new(0, slamHeight, 0) * FLAT
+    end
+
+    if activeMode == 1 then
+        return BACK_OFFSET
+    end
+
+    if activeMode == 2 then
+        return CFrame.new(0, getNeckSeatY(targetPlayer, targetRoot, myRoot), 0) * SIT_ROT
+    end
+
+    if activeMode == 3 then
+        return CFrame.new(0, getUnderY(targetPlayer, targetRoot, myRoot), 0) * FLAT
+    end
+
+    if activeMode == 4 then
+        return CFrame.new(0, 0, waveZ(BUMP_FAR, BUMP_NEAR))
+    end
+
+    local y = getNeckSeatY(targetPlayer, targetRoot, myRoot)
+    return CFrame.new(0, y, -waveZ(SITBUMP_FAR, SITBUMP_NEAR)) * SIT_ROT
+end
+
+local isRunning = false
+local heartbeatConnection = nil
+local visualRoot = nil
+local visualPlayer = nil
+
+local function applyHumanoidState(humanoid)
+    if not humanoid then return end
+    local flat = slamActive or activeMode == 3
+    local wantSit = (not slamActive) and (activeMode == 2 or activeMode == 5)
+    if humanoid.Sit ~= wantSit then
+        humanoid.Sit = wantSit
+    end
+    if humanoid.PlatformStand ~= flat then
+        humanoid.PlatformStand = flat
+    end
+end
+
+local function renderTick()
+    local myRoot = getMyRoot()
+    if not (myRoot and activeMode and visualRoot and visualRoot.Parent and visualPlayer) then return end
+    myRoot.CFrame = visualRoot.CFrame * computeOffset(visualPlayer, visualRoot, myRoot)
+end
+
+local function heartbeatTick()
+    local myRoot = getMyRoot()
+    if not (myRoot and activeMode) then return end
+
+    local targetPlayer, targetRoot, noMatch = resolveTarget()
+    if not (targetPlayer and targetRoot) then
+        visualRoot = nil
+        visualPlayer = nil
+        slamActive = false
+        status.Text = noMatch and "No match" or "No target"
+        return
+    end
+
+    if slamActive then
+        slamHeight = slamHeight - SLAM_STEP
+        if slamHeight <= getUnderY(targetPlayer, targetRoot, myRoot) then
+            slamActive = false
+        end
+    end
+
+    visualRoot = targetRoot
+    visualPlayer = targetPlayer
+
+    if type(sethiddenproperty) == "function" then
+        pcall(sethiddenproperty, myRoot, "PhysicsRepRootPart", targetRoot)
+    end
+
+    applyHumanoidState(getMyHumanoid())
+
+    myRoot.CFrame = computeOffset(targetPlayer, targetRoot, myRoot)
+
+    if slamActive then
+        myRoot.AssemblyLinearVelocity = Vector3.new(0, -SLAM_VELOCITY, 0)
+        myRoot.AssemblyAngularVelocity = Vector3.zero
+    elseif activeMode == 4 and isApproaching() then
+        myRoot.AssemblyLinearVelocity = targetRoot.CFrame.LookVector * BUMP_VELOCITY
+        myRoot.AssemblyAngularVelocity = Vector3.zero
+    elseif activeMode == 5 and isApproaching() then
+        myRoot.AssemblyLinearVelocity = -targetRoot.CFrame.LookVector * BUMP_VELOCITY
+        myRoot.AssemblyAngularVelocity = Vector3.zero
+    else
+        zeroVelocity(myRoot)
+    end
+
+    status.Text = (slamActive and "Slam -> " or "-> ") .. targetPlayer.Name
+end
+
+local function start()
+    if isRunning then return end
+    isRunning = true
+    heartbeatConnection = RunService.Heartbeat:Connect(heartbeatTick)
+    RunService:BindToRenderStep(RENDER_NAME, Enum.RenderPriority.Camera.Value - 1, renderTick)
+end
+
+local function stop()
+    isRunning = false
+    slamActive = false
+    activeMode = nil
+    updateButtons()
+
+    if heartbeatConnection then
+        heartbeatConnection:Disconnect()
+        heartbeatConnection = nil
+    end
+    pcall(function()
+        RunService:UnbindFromRenderStep(RENDER_NAME)
+    end)
+
+    local myRoot = getMyRoot()
+    local humanoid = getMyHumanoid()
+
+    if myRoot then
+        if type(sethiddenproperty) == "function" then
+            pcall(sethiddenproperty, myRoot, "PhysicsRepRootPart", nil)
+        end
+
+        if visualRoot and visualRoot.Parent then
+            local behind = visualRoot.Position + Vector3.new(0, 3, 0) - visualRoot.CFrame.LookVector * EXIT_DISTANCE
+            myRoot.CFrame = CFrame.new(behind)
+        end
+        zeroVelocity(myRoot)
+    end
+
+    if humanoid then
+        humanoid.PlatformStand = false
+        humanoid.Sit = false
+    end
+    visualRoot = nil
+    visualPlayer = nil
+
+    task.spawn(function()
+        for _ = 1, 15 do
+            RunService.Heartbeat:Wait()
+            zeroVelocity(getMyRoot())
+        end
+    end)
+
+    status.Text = "Idle"
+end
+
+local function setMode(index)
+    if activeMode == index then
+        stop()
+        return
+    end
+    activeMode = index
+    slamActive = false
+    updateButtons()
+    start()
+end
+
+for i, button in ipairs(modeButtons) do
+    button.MouseButton1Click:Connect(function()
+        setMode(i)
+    end)
+end
+
+slamButton.MouseButton1Click:Connect(function()
+    if not (isRunning and activeMode) then
+        status.Text = "Turn a mode on first"
+        return
+    end
+    if slamActive then return end
+    if not visualRoot then return end
+    slamHeight = SLAM_START
+    slamActive = true
+end)
+
+LocalPlayer.CharacterAdded:Connect(function()
+    if isRunning then
+        stop()
+    end
+end)
