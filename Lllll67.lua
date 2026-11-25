@@ -1,10 +1,24 @@
+--jsjsjsjsnsn
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 
-local SavedTorsos = {}
-local ReplicaName = "7S_TorsoReplica"
-local NoColName = "7S_NoCol"
 local ScaleFactor = 3.4
+local ContainerName = "7S_Replicas"
+local Entries = {}
+local Versions = {}
+
+local function GetContainer()
+    local camera = workspace.CurrentCamera
+    if not camera then return nil end
+    local container = camera:FindFirstChild(ContainerName)
+    if not container then
+        container = Instance.new("Folder")
+        container.Name = ContainerName
+        container.Parent = camera
+    end
+    return container
+end
 
 local function GetTorso(character)
     return character:FindFirstChild("Torso") or character:FindFirstChild("UpperTorso")
@@ -14,88 +28,39 @@ local function IsAppearanceItem(child)
     return child:IsA("Shirt") or child:IsA("ShirtGraphic") or child:IsA("BodyColors") or (child:IsA("CharacterMesh") and child.BodyPart == Enum.BodyPart.Torso)
 end
 
-local function ApplyNoCollisionWithLocal(targetPart)
-    if not targetPart or not targetPart:IsA("BasePart") then return end
-    for _, child in ipairs(targetPart:GetChildren()) do
-        if child.Name == NoColName then
-            child:Destroy()
-        end
-    end
-    local localChar = LocalPlayer.Character
-    if not localChar then return end
-    for _, part in ipairs(localChar:GetDescendants()) do
-        if part:IsA("BasePart") then
-            local ncc = Instance.new("NoCollisionConstraint")
-            ncc.Name = NoColName
-            ncc.Part0 = targetPart
-            ncc.Part1 = part
-            ncc.Parent = targetPart
-        end
-    end
-end
-
-local function RemoveReplica(character)
-    local existing = character:FindFirstChild(ReplicaName)
-    if existing then
-        existing:Destroy()
-    end
-end
-
-local function DestroyData(data)
-    if not data then return end
-    if data.Body then
-        data.Body:Destroy()
-    end
-    if data.Appearance then
-        for _, item in ipairs(data.Appearance) do
-            item:Destroy()
-        end
-    end
-end
-
-local function ResetCharacterState(player, character)
-    RemoveReplica(character)
-    local torso = GetTorso(character)
-    local data = SavedTorsos[player.UserId]
-    if torso and data and data.OriginalSize then
-        torso.Size = data.OriginalSize
-        torso.Transparency = data.OriginalTransparency
-        torso.CanCollide = data.OriginalCanCollide
-        torso.Massless = data.OriginalMassless
+local function Release(player)
+    local entry = Entries[player]
+    if not entry then return end
+    Entries[player] = nil
+    local torso = entry.Torso
+    if torso and torso.Parent then
+        torso.Size = entry.OriginalSize
+        torso.Transparency = entry.OriginalTransparency
+        torso.CanCollide = entry.OriginalCanCollide
         for _, child in ipairs(torso:GetChildren()) do
-            if child:IsA("FaceInstance") and child:GetAttribute("HiddenBy7S") then
-                child.Transparency = 0
-                child:SetAttribute("HiddenBy7S", nil)
+            if child:IsA("FaceInstance") then
+                local saved = child:GetAttribute("HiddenBy7S")
+                if typeof(saved) == "number" then
+                    child.Transparency = saved
+                    child:SetAttribute("HiddenBy7S", nil)
+                end
             end
         end
     end
+    if entry.Model then
+        entry.Model:Destroy()
+    end
 end
 
-local function CaptureAppearance(player, character)
-    local data = SavedTorsos[player.UserId]
-    if not data then return end
-    if data.Appearance then
-        for _, item in ipairs(data.Appearance) do
-            item:Destroy()
-        end
-    end
-    local list = {}
-    for _, child in ipairs(character:GetChildren()) do
-        if IsAppearanceItem(child) then
-            local clone = child:Clone()
-            if clone then
-                table.insert(list, clone)
-            end
-        end
-    end
-    data.Appearance = list
-end
+local function Build(player, character)
+    Release(player)
+    if not character.Parent or player.Character ~= character then return end
 
-local function CaptureTorso(player, character)
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if not humanoid or humanoid.Health <= 0 then return end
+
     local torso = GetTorso(character)
     if not torso then return end
-
-    DestroyData(SavedTorsos[player.UserId])
 
     local body = torso:Clone()
     if not body then return end
@@ -104,104 +69,68 @@ local function CaptureTorso(player, character)
             child:Destroy()
         end
     end
-    body.Anchored = false
+    body.Anchored = true
     body.CanCollide = false
     body.CanTouch = false
     body.CanQuery = false
     body.Massless = true
 
-    local humanoid = character:FindFirstChildOfClass("Humanoid")
-
-    SavedTorsos[player.UserId] = {
-        OriginalSize = torso.Size,
-        OriginalTransparency = torso.Transparency,
-        OriginalCanCollide = torso.CanCollide,
-        OriginalMassless = torso.Massless,
-        RigType = humanoid and humanoid.RigType or Enum.HumanoidRigType.R6,
-        Body = body,
-        Appearance = {}
-    }
-
-    CaptureAppearance(player, character)
-end
-
-local function BuildReplicaTorso(player, character, realTorso)
-    RemoveReplica(character)
-    local data = SavedTorsos[player.UserId]
-    if not data or not data.Body then return end
-
     local model = Instance.new("Model")
-    model.Name = ReplicaName
+    model.Name = player.Name
 
-    local humanoid = Instance.new("Humanoid")
-    humanoid.RigType = data.RigType
-    humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
-    humanoid.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
-    humanoid.BreakJointsOnDeath = false
-    humanoid.RequiresNeck = false
-    humanoid.Parent = model
+    local replicaHumanoid = Instance.new("Humanoid")
+    replicaHumanoid.RigType = humanoid.RigType
+    replicaHumanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+    replicaHumanoid.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
+    replicaHumanoid.BreakJointsOnDeath = false
+    replicaHumanoid.RequiresNeck = false
+    pcall(function()
+        replicaHumanoid.EvaluateStateMachine = false
+    end)
+    replicaHumanoid.Parent = model
 
-    local replica = data.Body:Clone()
-    replica.Size = data.OriginalSize
-    replica.Transparency = data.OriginalTransparency
-    replica.CFrame = realTorso.CFrame
-    replica.Parent = model
+    body.Parent = model
 
-    for _, item in ipairs(data.Appearance) do
-        local clone = item:Clone()
-        if clone then
-            clone.Parent = model
+    for _, child in ipairs(character:GetChildren()) do
+        if IsAppearanceItem(child) then
+            local clone = child:Clone()
+            if clone then
+                clone.Parent = model
+            end
         end
     end
 
-    model.PrimaryPart = replica
+    model.PrimaryPart = body
+    model.Parent = GetContainer() or workspace
 
-    local weld = Instance.new("WeldConstraint")
-    weld.Part0 = realTorso
-    weld.Part1 = replica
-    weld.Parent = replica
-
-    local selfNoCol = Instance.new("NoCollisionConstraint")
-    selfNoCol.Part0 = realTorso
-    selfNoCol.Part1 = replica
-    selfNoCol.Parent = replica
-
-    model.Parent = character
-    ApplyNoCollisionWithLocal(realTorso)
-    ApplyNoCollisionWithLocal(replica)
-end
-
-local function ApplyHitboxAndReplica(player, character)
-    local data = SavedTorsos[player.UserId]
-    if not data or not data.OriginalSize then return end
-
-    local torso = GetTorso(character)
-    if not torso then return end
-
-    local humanoid = character:FindFirstChildOfClass("Humanoid")
-    if humanoid and humanoid.Health <= 0 then
-        ResetCharacterState(player, character)
-        return
-    end
+    local entry = {
+        Character = character,
+        Torso = torso,
+        Humanoid = humanoid,
+        Model = model,
+        Body = body,
+        OriginalSize = torso.Size,
+        OriginalTransparency = torso.Transparency,
+        OriginalCanCollide = torso.CanCollide
+    }
+    Entries[player] = entry
 
     for _, child in ipairs(torso:GetChildren()) do
         if child:IsA("FaceInstance") and child.Transparency < 1 then
-            child:SetAttribute("HiddenBy7S", true)
+            child:SetAttribute("HiddenBy7S", child.Transparency)
             child.Transparency = 1
         end
     end
 
-    torso.Size = data.OriginalSize * ScaleFactor
+    torso.Size = entry.OriginalSize * ScaleFactor
     torso.Transparency = 1
     torso.CanCollide = false
-    torso.Massless = true
-
-    BuildReplicaTorso(player, character, torso)
+    body.CFrame = torso.CFrame
 end
 
 local function WaitForAppearance(player, character)
     local waited = 0
-    while waited < 6 and character.Parent do
+    while waited < 5 and character.Parent do
         local ok, loaded = pcall(function()
             return player:HasAppearanceLoaded()
         end)
@@ -211,7 +140,7 @@ local function WaitForAppearance(player, character)
     end
 end
 
-local function WatchCharacter(player, character)
+local function Watch(player, character)
     if player == LocalPlayer then return end
 
     local torso = character:WaitForChild("Torso", 5) or character:WaitForChild("UpperTorso", 5)
@@ -221,46 +150,41 @@ local function WatchCharacter(player, character)
     if not character.Parent then return end
     task.wait(0.25)
 
-    CaptureTorso(player, character)
-    ApplyHitboxAndReplica(player, character)
+    Build(player, character)
 
-    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    local humanoid = character:FindFirstChildOfClass("Humanoid") or character:WaitForChild("Humanoid", 5)
     if humanoid then
         humanoid.Died:Connect(function()
-            ResetCharacterState(player, character)
+            Release(player)
+        end)
+    end
+
+    local function Schedule()
+        local token = (Versions[player] or 0) + 1
+        Versions[player] = token
+        task.delay(0.3, function()
+            if Versions[player] == token and character.Parent and player.Character == character then
+                Build(player, character)
+            end
         end)
     end
 
     character.ChildAdded:Connect(function(child)
-        if child.Name == "Torso" or child.Name == "UpperTorso" then
-            task.defer(function()
-                CaptureTorso(player, character)
-                ApplyHitboxAndReplica(player, character)
-            end)
-        elseif child:IsA("Humanoid") then
-            child.Died:Connect(function()
-                ResetCharacterState(player, character)
-            end)
-        elseif IsAppearanceItem(child) then
-            task.defer(function()
-                CaptureAppearance(player, character)
-                local currentTorso = GetTorso(character)
-                if currentTorso and SavedTorsos[player.UserId] then
-                    BuildReplicaTorso(player, character, currentTorso)
-                end
-            end)
+        if child.Name == "Torso" or child.Name == "UpperTorso" or IsAppearanceItem(child) then
+            Schedule()
         end
     end)
 
     character.ChildRemoved:Connect(function(child)
         if child.Name == "Torso" or child.Name == "UpperTorso" then
-            task.defer(function()
-                local restored = GetTorso(character)
-                if restored then
-                    CaptureTorso(player, character)
-                    ApplyHitboxAndReplica(player, character)
-                end
-            end)
+            Release(player)
+            Schedule()
+        end
+    end)
+
+    character.AncestryChanged:Connect(function()
+        if not character.Parent then
+            Release(player)
         end
     end)
 end
@@ -268,12 +192,33 @@ end
 local function SetupPlayer(player)
     if player == LocalPlayer then return end
     if player.Character then
-        task.spawn(WatchCharacter, player, player.Character)
+        task.spawn(Watch, player, player.Character)
     end
     player.CharacterAdded:Connect(function(character)
-        task.spawn(WatchCharacter, player, character)
+        task.spawn(Watch, player, character)
     end)
 end
+
+RunService.RenderStepped:Connect(function()
+    local container = GetContainer()
+    for player, entry in pairs(Entries) do
+        local torso = entry.Torso
+        if not entry.Character.Parent or torso.Parent ~= entry.Character or entry.Humanoid.Health <= 0 then
+            Release(player)
+        else
+            entry.Body.CFrame = torso.CFrame
+            if container and entry.Model.Parent ~= container then
+                entry.Model.Parent = container
+            end
+        end
+    end
+end)
+
+RunService.Stepped:Connect(function()
+    for _, entry in pairs(Entries) do
+        entry.Torso.CanCollide = false
+    end
+end)
 
 for _, player in ipairs(Players:GetPlayers()) do
     SetupPlayer(player)
@@ -282,21 +227,6 @@ end
 Players.PlayerAdded:Connect(SetupPlayer)
 
 Players.PlayerRemoving:Connect(function(player)
-    DestroyData(SavedTorsos[player.UserId])
-    SavedTorsos[player.UserId] = nil
-end)
-
-LocalPlayer.CharacterAdded:Connect(function()
-    task.wait(1)
-    for _, player in ipairs(Players:GetPlayers()) do
-        local character = player.Character
-        if player ~= LocalPlayer and character then
-            local torso = GetTorso(character)
-            local replicaModel = character:FindFirstChild(ReplicaName)
-            ApplyNoCollisionWithLocal(torso)
-            if replicaModel and replicaModel.PrimaryPart then
-                ApplyNoCollisionWithLocal(replicaModel.PrimaryPart)
-            end
-        end
-    end
+    Release(player)
+    Versions[player] = nil
 end)
